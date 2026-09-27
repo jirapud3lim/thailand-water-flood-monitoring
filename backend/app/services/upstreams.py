@@ -102,37 +102,6 @@ async def fetch_river(lat: float, lon: float, settings: Settings) -> dict[str, A
     )
 
 
-async def fetch_gistda_flood(
-    bbox: tuple[float, float, float, float],
-    settings: Settings,
-) -> dict[str, Any]:
-    if not settings.gistda_flood_url:
-        return {
-            "type": "FeatureCollection",
-            "features": [],
-            "source_status": "not_configured",
-        }
-
-    headers = {}
-    if settings.gistda_api_key:
-        headers[settings.gistda_api_key_header] = settings.gistda_api_key
-    min_lon, min_lat, max_lon, max_lat = bbox
-    data = await _get_json(
-        settings.gistda_flood_url,
-        settings,
-        params={"bbox": f"{min_lon},{min_lat},{max_lon},{max_lat}"},
-        headers=headers,
-    )
-    if data.get("type") == "FeatureCollection":
-        data.setdefault("source_status", "live")
-        return data
-    return {
-        "type": "FeatureCollection",
-        "features": data.get("features", []),
-        "source_status": "live",
-    }
-
-
 def _name_key(value: str | None) -> str:
     return "".join((value or "").split()).replace("อ่างเก็บน้ำ", "เขื่อน")
 

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +20,13 @@ DEFAULT_REFRESH_TTL: dict[str, int] = {
     "weather": 300,
     "river": 3600,
     "dams": 3600,
+    # TMD NWP runs a few times a day and every call spends datapoint quota.
+    "tmd-provinces": 10800,
+    "tmd-tambon": 10800,
+    "tmd-hourly": 3600,
+    "dam-photos": 604800,  # curated Commons files; only credits could change
+    "local-news": 900,
+    "local-social": 600,
 }
 
 
@@ -33,11 +40,21 @@ class Settings(BaseSettings):
     cache_max_entries: int = 512
     upstream_retries: int = 1
 
-    gistda_flood_url: str = ""
+    # GISTDA Disaster Platform key (api-gateway.gistda.or.th); flood layers stay off until set.
     gistda_api_key: str = ""
-    gistda_api_key_header: str = "api-key"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # TomTom Traffic Flow tiles; the traffic layer stays off until this is set.
+    tomtom_api_key: str = ""
+
+    # TMD NWP forecast API bearer token (data.tmd.go.th/nwpapi). TDM_API_KEY is accepted
+    # too because that is how the key was first written into .env.
+    tmd_api_key: str = Field("", validation_alias=AliasChoices("tmd_api_key", "TMD_API_KEY", "TDM_API_KEY"))
+    # Leave quota for the national forecast and high-priority flood-area lookups.
+    tmd_quota_reserve: int = 5000
+    # Stay below TMD's observed 60 requests/minute ceiling.
+    tmd_requests_per_minute: int = 50
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 
     def ttl(self, source: str) -> int:
         value = self.refresh_ttl.get(source, DEFAULT_REFRESH_TTL.get(source, self.cache_ttl_seconds))

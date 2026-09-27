@@ -123,6 +123,14 @@ def rain_severity(rain_mm: float | None) -> str:
     return "normal"
 
 
+# ThaiWater's canal warning/critical levels are set well below the physical bank (e.g. a 1.0 m
+# bank with critical_level 0.2 m) — likely a pumping-control threshold, not a flood threshold.
+# Checked live on 2026-09-27: of 88 "critical" canal stations by that threshold, only 7 actually
+# reached the bank and 71 were far below it. Severity here is measured against the bank instead;
+# `warning`/`critical` still feed the "เฝ้าระวังต่ำ" step so that signal isn't thrown away.
+CANAL_BANK_MARGIN_M = 0.3
+
+
 def canal_severity(
     level: float | None,
     warning: float | None,
@@ -131,12 +139,15 @@ def canal_severity(
 ) -> str:
     if level is None:
         return "unknown"
-    critical = critical if critical is not None else bank
-    if critical is not None and level >= critical:
-        return "critical"
-    if warning is not None and level >= warning:
-        return "high"
-    if warning is None and critical is None:
+    if bank is not None and bank > 0:
+        if level >= bank:
+            return "critical"
+        if bank - level <= CANAL_BANK_MARGIN_M:
+            return "high"
+    threshold = critical if critical is not None else warning
+    if threshold is not None and level >= threshold:
+        return "low"
+    if warning is None and critical is None and (bank is None or bank <= 0):
         return "unknown"
     return "normal"
 
@@ -216,6 +227,7 @@ def normalize_canals(payload: Any) -> list[dict[str, Any]]:
             "warning_level_m": warning,
             "critical_level_m": critical,
             "bank_level_m": bank,
+            "bank_clearance_m": None if level is None or bank is None or bank <= 0 else round(bank - level, 2),
             "observed_at": record.get("canal_datetime"),
         }))
     return features

@@ -9,23 +9,61 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <!-- One SVG icon set (24 px grid, 2 px round strokes) so icons render the same on every OS/font.
+         Data-type icons (i-*) are line drawings; severity marks (sev-*) are filled shapes whose form
+         changes with the level, so the level still reads in greyscale. -->
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 2.8c-3.3 4-6.3 7.7-6.3 11.2a6.3 6.3 0 0 0 12.6 0c0-3.5-3-7.2-6.3-11.2z"/><path d="M8.6 14.8c1.1.7 2.3.7 3.4 0s2.3-.7 3.4 0"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></symbol>
+      <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5"/><path d="M12 17.3h.01"/></symbol>
+      <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7a5 5 0 1 0 5 5"/><path d="m12 12 6.4-6.4"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></symbol>
+      <symbol id="i-satellite" viewBox="0 0 24 24"><path d="M12 7.8 16.2 12 12 16.2 7.8 12z"/><path d="M9.8 4.2 7.8 2.2 2.2 7.8l2 2z"/><path d="m21.8 16.2-2-2-5.6 5.6 2 2z"/><path d="M9.9 9.9 7 7M14.1 14.1 17 17"/><path d="M15.5 3.5a5 5 0 0 1 5 5M15.5 6.3a2.2 2.2 0 0 1 2.2 2.2"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+      <symbol id="i-dam" viewBox="0 0 24 24"><path d="M13 4h3l5 16h-8z"/><path d="M2 9.5c1.2 0 1.8-.8 3-.8s1.8.8 3 .8 1.8-.8 3-.8M2 13.5c1.2 0 1.8-.8 3-.8s1.8.8 3 .8 1.8-.8 3-.8M2 17.5c1.2 0 1.8-.8 3-.8s1.8.8 3 .8 1.8-.8 3-.8"/><path d="M2 21h20"/></symbol>
+      <symbol id="i-pin-alert" viewBox="0 0 24 24"><path d="M12 21.5s-7-6.1-7-11.8a7 7 0 0 1 14 0c0 5.7-7 11.8-7 11.8z"/><path d="M12 6.5v4.2"/><path d="M12 13.6h.01"/></symbol>
+      <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M7 3v14"/><path d="M7 5h3M7 8.5h2M7 12h3M7 15.5h2"/><path d="M13 11c1.2 0 1.8-.8 3-.8s1.8.8 3 .8 1.8-.8 3-.8"/><path d="M2 20c1.7 0 2.5-1.3 4-1.3s2.3 1.3 4 1.3 2.5-1.3 4-1.3 2.3 1.3 4 1.3 2.5-1.3 4-1.3"/></symbol>
+      <symbol id="i-rain" viewBox="0 0 24 24"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 14v6M8 14v6M12 16v6"/></symbol>
+      <symbol id="i-canal" viewBox="0 0 24 24"><path d="M5 3c1.8 6 1.8 12 0 18M19 3c-1.8 6-1.8 12 0 18"/><path d="M9 9.5c1 0 1.5-.7 3-.7s2 .7 3 .7M9 14.5c1 0 1.5-.7 3-.7s2 .7 3 .7"/></symbol>
+      <symbol id="i-gate" viewBox="0 0 24 24"><path d="M4 3v18M20 3v18M4 6h16"/><rect x="7" y="8" width="10" height="6" rx="1"/><path d="M4 18c1.3 0 2-.9 4-.9s2.7.9 4 .9 2-.9 4-.9 2.7.9 4 .9"/></symbol>
+      <symbol id="sev-normal" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="m8 12.3 2.7 2.7L16 9.6" fill="none" stroke="currentColor" stroke-width="2.4"/></symbol>
+      <symbol id="sev-low" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="sev-moderate" viewBox="0 0 24 24"><path d="M12 3.4 21.4 19.8H2.6z" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 9.6v4.4" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="16.9" r="1.3" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="sev-high" viewBox="0 0 24 24"><path d="M12 2.3 22.4 20.5H1.6z" fill="currentColor" stroke="none"/><path d="M12 9.3v4.7" stroke="var(--mark, #fff)" stroke-width="2.4"/><circle cx="12" cy="17.1" r="1.35" fill="var(--mark, #fff)" stroke="none"/></symbol>
+      <symbol id="sev-critical" viewBox="0 0 24 24"><path d="M8.2 2h7.6L22 8.2v7.6L15.8 22H8.2L2 15.8V8.2z" fill="currentColor" stroke="none"/><path d="M12 6.8v6.2" stroke="var(--mark, #fff)" stroke-width="2.6"/><circle cx="12" cy="16.8" r="1.5" fill="var(--mark, #fff)" stroke="none"/></symbol>
+      <symbol id="sev-unknown" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="3.2 2.6"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.6" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="16.9" r="1.2" fill="currentColor" stroke="none"/></symbol>
+    </svg>
     <header class="app-header">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">≈</div>
+        <div class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-drop"/></svg></div>
         <div>
           <p class="eyebrow">THAILAND WATER INTELLIGENCE</p>
           <h1>ศูนย์ติดตามสถานการณ์น้ำ</h1>
         </div>
       </div>
       <div class="header-actions">
-        <button id="refresh-all" class="icon-button" type="button" title="รีเฟรชข้อมูล" aria-label="รีเฟรชข้อมูล">↻</button>
-        <div id="connection" class="status" role="status"><i></i><span>กำลังเชื่อมต่อ…</span></div>
-        <button id="sidebar-toggle" class="icon-button menu-button" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="เปิดเมนู">☰</button>
+        <button id="refresh-all" class="icon-button" type="button" title="รีเฟรชข้อมูล" aria-label="รีเฟรชข้อมูล"><svg class="icon"><use href="#i-refresh"/></svg></button>
+        <button id="connection" class="status" type="button" aria-expanded="false" aria-controls="status-detail" aria-label="สถานะแหล่งข้อมูล: กำลังเชื่อมต่อ"><i aria-hidden="true"></i><span class="status-long">กำลังเชื่อมต่อ…</span><span class="status-short" aria-hidden="true">…</span></button>
+        <div id="status-detail" class="status-detail" role="region" aria-label="สถานะรายแหล่งข้อมูล" hidden>
+          <p class="status-detail-title">สถานะรายแหล่งข้อมูล</p>
+          <ul></ul>
+          <p class="status-detail-help">ข้อมูลสำรอง = ใช้ค่าที่เก็บไว้ครั้งก่อนเพราะต้นทางไม่ตอบ อาจไม่ใช่ค่าล่าสุด</p>
+        </div>
+        <button id="sidebar-toggle" class="icon-button menu-button" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="เปิดเมนู"><svg class="icon"><use href="#i-menu"/></svg></button>
       </div>
     </header>
     <main>
       <aside id="sidebar" aria-label="แผงควบคุมแผนที่">
         <div class="sidebar-scroll">
+          <nav class="sidebar-nav" aria-label="ไปยังส่วนในแผงควบคุม">
+            <button type="button" data-jump="priority-title">จุดเตือน</button>
+            <button type="button" data-jump="area-forecast-title">พยากรณ์ฝน</button>
+            <button type="button" data-jump="layers-title">สถานี/เขื่อน</button>
+            <button type="button" data-jump="legend-title">สัญลักษณ์</button>
+          </nav>
           <section class="overview" aria-labelledby="overview-title">
             <div class="section-heading">
               <div>
@@ -36,88 +74,124 @@
             </div>
             <div class="kpi-grid">
               <article class="kpi wide priority-kpi">
-                <span class="kpi-icon alert">≈</span>
-                <div><strong id="alert-count">—</strong><span title="จุดเฝ้าระวังของ ปภ. ที่ถึงระดับเตือน ในขอบเขตแผนที่ปัจจุบัน">จุดเตือนจาก ปภ. ในพื้นที่ที่เห็น</span></div>
+                <span class="kpi-icon alert" aria-hidden="true"><svg class="icon"><use href="#i-alert"/></svg></span>
+                <div><strong id="alert-count">—</strong><span id="alert-count-label">จุดถึงระดับเตือนในจอ · นับไม่ซ้ำ</span>
+                  <small id="priority-observed" class="kpi-note" aria-live="polite">กำลังโหลด…</small></div>
               </article>
               <article class="kpi">
-                <span class="kpi-icon dam">▰</span>
+                <span class="kpi-icon dam" aria-hidden="true"><svg class="icon"><use href="#i-dam"/></svg></span>
                 <div><strong id="dam-count">—</strong><span>เขื่อนทั่วประเทศ</span></div>
               </article>
               <article class="kpi">
-                <span class="kpi-icon radar">◉</span>
+                <span class="kpi-icon radar" aria-hidden="true"><svg class="icon"><use href="#i-radar"/></svg></span>
                 <div><strong id="radar-summary">—</strong><span>เวลาเรดาร์ที่เลือก</span></div>
               </article>
             </div>
+            <details class="count-help">
+              <summary>ตัวเลขนี้นับอย่างไร</summary>
+              <p><b>จุดถึงระดับเตือน</b> = สถานีระดับน้ำแม่น้ำ (ปภ. และ ThaiWater) กับจุดวัดน้ำขังถนน ที่ระดับ <b>เฝ้าระวังขึ้นไป</b> ในขอบเขตที่เลือก (ในจอ หรือทั้งจังหวัด) สถานีเดียวกันที่มีทั้งใน ปภ. และ ThaiWater นับครั้งเดียว ไม่รวมสถานีฝนและคลอง</p>
+              <p><b>จำนวนหมุดในหัวข้อ "หมุดสถานีและเขื่อน"</b> นับต่างกัน: นับแยกทีละชั้น เฉพาะในกรอบแผนที่ รวมฝนและคลอง และบอกจำนวนที่ซ่อนไว้ตามเหตุ (ต่ำกว่าเกณฑ์, ต้องซูมเข้า, ซ้ำกับ ThaiWater) ตัวเลขสองชุดนี้จึงไม่จำเป็นต้องเท่ากัน</p>
+              <p>ไม่พบจุดเตือน ไม่ได้แปลว่าพื้นที่ปลอดภัย พื้นที่นั้นอาจไม่มีสถานี</p>
+            </details>
           </section>
           <section aria-labelledby="priority-title">
             <div class="section-heading compact">
-              <h2 id="priority-title">จุดที่ควรดูในพื้นที่</h2>
+              <h2 id="priority-title" tabindex="-1">จุดที่ควรดูในพื้นที่</h2>
               <span id="priority-meta" class="priority-meta">กำลังโหลด…</span>
             </div>
-            <p id="priority-observed" class="source-age">รอเวลาข้อมูลสถานี ปภ.</p>
-            <div id="priority-list" class="priority-list">
-              <p class="priority-empty">กำลังตรวจข้อมูลสถานี ปภ.</p>
+            <label class="scope-picker" for="priority-scope">
+              <span>ขอบเขตรายการ</span>
+              <select id="priority-scope">
+                <option value="">ทั้งหมดในจอ</option>
+              </select>
+            </label>
+            <div id="forecast-line" class="forecast-line" hidden></div>
+            <button id="scope-forecast" class="link-button scope-forecast" type="button" hidden></button>
+            <div id="priority-list" class="priority-list" aria-busy="true">
+              <p class="priority-empty is-loading"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg><span>กำลังโหลดรายการจุดเตือน…</span></p>
             </div>
-            <p class="section-help">แสดงสูงสุด 3 จุดต่อประเภทตามระดับเตือน · กดเพื่อดูค่าที่วัด</p>
+            <div id="satellite-priority" class="priority-list satellite-priority" hidden></div>
+            <p class="section-help">เรียงตามระดับเตือน · เลือกจังหวัดเพื่อดูครบทั้งจังหวัดโดยไม่ขึ้นกับการเลื่อนแผนที่ · สถานีที่มีทั้งใน ปภ. และ ThaiWater ใช้ค่าที่ใหม่กว่า</p>
+          </section>
+          <section aria-labelledby="local-news-title" id="local-news-section" hidden>
+            <div class="section-heading compact">
+              <h2 id="local-news-title">ข่าวน้ำและฝนในจังหวัด</h2>
+              <span id="local-news-province" class="priority-meta"></span>
+            </div>
+            <p class="section-help">ข่าวประกอบจากกรมประชาสัมพันธ์ ไม่ใช่คำเตือนภัยหรือหลักฐานว่าสถานีในพื้นที่ข่าวได้รับผลกระทบ</p>
+            <div id="local-news-list" class="local-news-list" aria-live="polite"></div>
+          </section>
+          <section aria-labelledby="local-social-title" id="local-social-section" hidden>
+            <div class="section-heading compact">
+              <h2 id="local-social-title">คลิปข่าวจากสื่อสังคม</h2>
+              <span id="local-social-province" class="priority-meta"></span>
+            </div>
+            <p class="section-help">คลิปจากช่อง News NBT2HD ที่ระบุจังหวัดและเรื่องน้ำ/ฝนในข้อความ · จับคู่ระดับจังหวัด ไม่ยืนยันว่าเหตุเกิดใกล้จุดเตือน และไม่ใช้คำนวณระดับความเสี่ยง</p>
+            <div id="local-social-list" class="local-news-list" aria-live="polite"></div>
+          </section>
+          <section aria-labelledby="area-forecast-title">
+            <div class="section-heading compact">
+              <h2 id="area-forecast-title" tabindex="-1">พยากรณ์ฝนรายพื้นที่</h2>
+              <span id="area-forecast-status" class="time-badge">TMD · รายชั่วโมง</span>
+            </div>
+            <p class="section-help area-scope-help">เลือกพื้นที่ในส่วนนี้ใช้กับพยากรณ์เท่านั้น ไม่เปลี่ยนรายการจุดเตือนหรือแผนที่</p>
+            <p id="area-forecast-prefill" class="area-prefill" role="status" hidden></p>
+            <form id="area-forecast-form" class="area-forecast-form">
+              <label><span>จังหวัด</span><select id="area-province" required><option value="">กำลังโหลด…</option></select></label>
+              <label><span>อำเภอ / เขต</span><select id="area-district" disabled><option value="">เลือกจังหวัดก่อน</option></select></label>
+              <label><span>ตำบล / แขวง</span><select id="area-subdistrict" disabled><option value="">เลือกอำเภอก่อน</option></select></label>
+              <div class="area-forecast-actions">
+                <label><span>ช่วงเวลา</span><select id="area-forecast-hours"><option value="24" selected>24 ชั่วโมง</option><option value="48">48 ชั่วโมง</option></select></label>
+                <button id="area-forecast-submit" class="primary-button" type="submit" disabled>ดูพยากรณ์</button>
+              </div>
+            </form>
+            <div id="area-forecast-result" class="metrics empty-state" aria-live="polite">
+              <span class="empty-icon" aria-hidden="true"><svg class="icon"><use href="#i-rain"/></svg></span>
+              <strong>เลือกพื้นที่</strong>
+              <small>ค่าพยากรณ์ ณ จุดอ้างอิงของพื้นที่ ไม่ใช่ค่าเฉลี่ยทั้งพื้นที่</small>
+            </div>
+            <p class="section-help">ข้อมูลแบบจำลอง TMD NWP · แยกจากฝนที่วัดจริงของสถานี ThaiWater</p>
           </section>
           <section aria-labelledby="layers-title">
             <div class="section-heading compact">
-              <h2 id="layers-title">ชั้นข้อมูล</h2>
-              <span id="layer-counts" class="layer-counts">กำลังโหลด…</span>
+              <h2 id="layers-title" tabindex="-1">หมุดสถานีและเขื่อน</h2>
             </div>
+            <p id="layer-counts" class="layer-counts">กำลังโหลด…</p>
             <div class="layer-list">
-              <label class="layer-control" for="radar-toggle">
-                <span class="layer-symbol radar">◉</span>
-                <span class="layer-copy"><strong>เรดาร์ฝน</strong><small>ภาพฝนย้อนหลัง 2 ชั่วโมง</small></span>
-                <input id="radar-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
-              </label>
-              <label class="layer-control" for="flood-toggle">
-                <span class="layer-symbol flood">▧</span>
-                <span class="layer-copy"><strong>ขอบเขตน้ำท่วม</strong><small>พื้นที่จากข้อมูลดาวเทียม</small></span>
-                <input id="flood-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
-              </label>
               <label class="layer-control" for="dam-toggle">
-                <span class="layer-symbol dam">▰</span>
-                <span class="layer-copy"><strong>ปริมาณน้ำในเขื่อน</strong><small>กักเก็บ ไหลเข้า และระบาย</small></span>
+                <span class="layer-symbol dam" aria-hidden="true"><svg class="icon"><use href="#i-dam"/></svg></span>
+                <span class="layer-copy"><strong>ปริมาณน้ำในเขื่อน</strong><small>ปิดแล้วซ่อนทั้งหมุดและแผงเขื่อน</small></span>
                 <input id="dam-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
               </label>
               <label class="layer-control" for="flood-point-toggle">
-                <span class="layer-symbol station">≈</span>
-                <span class="layer-copy"><strong>จุดเฝ้าระวังน้ำท่วม</strong><small>สถานีระดับน้ำและถนน</small></span>
+                <span class="layer-symbol station" aria-hidden="true"><svg class="icon"><use href="#i-pin-alert"/></svg></span>
+                <span class="layer-copy"><strong>จุดเฝ้าระวังน้ำท่วม (ปภ.)</strong><small id="flood-point-meta">กำลังโหลด…</small></span>
                 <input id="flood-point-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
               </label>
-              <p class="layer-subhead">สถานีโทรมาตร · ThaiWater (สสน.)</p>
+              <details class="layer-group" data-remember="tw-layers">
+              <summary><span class="layer-group-title">สถานีโทรมาตร · ThaiWater (สสน.)</span><small id="tw-group-meta">กำลังโหลด…</small></summary>
               <label class="layer-control" for="tw-water-level-toggle">
-                <span class="layer-symbol river">≋</span>
+                <span class="layer-symbol river" aria-hidden="true"><svg class="icon"><use href="#i-gauge"/></svg></span>
                 <span class="layer-copy"><strong>ระดับน้ำแม่น้ำ</strong><small id="tw-water-level-meta">สถานีโทรมาตรทั่วประเทศ</small></span>
                 <input id="tw-water-level-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
               </label>
               <label class="layer-control" for="tw-rain-toggle">
-                <span class="layer-symbol rain">☂</span>
+                <span class="layer-symbol rain" aria-hidden="true"><svg class="icon"><use href="#i-rain"/></svg></span>
                 <span class="layer-copy"><strong>ฝนสะสม 24 ชม.</strong><small id="tw-rain-meta">สถานีวัดฝนทั่วประเทศ</small></span>
                 <input id="tw-rain-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
               </label>
               <label class="layer-control" for="tw-canal-toggle">
-                <span class="layer-symbol canal">⌇</span>
-                <span class="layer-copy"><strong>ระดับน้ำคลอง กทม.</strong><small id="tw-canal-meta">เทียบระดับเตือนภัยของสถานี</small></span>
+                <span class="layer-symbol canal" aria-hidden="true"><svg class="icon"><use href="#i-canal"/></svg></span>
+                <span class="layer-copy"><strong>ระดับน้ำคลอง กทม.</strong><small id="tw-canal-meta">ระดับเทียบกับตลิ่งคลอง</small></span>
                 <input id="tw-canal-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
               </label>
               <label class="layer-control" for="tw-watergate-toggle">
-                <span class="layer-symbol gate">⊟</span>
+                <span class="layer-symbol gate" aria-hidden="true"><svg class="icon"><use href="#i-gate"/></svg></span>
                 <span class="layer-copy"><strong>ประตูระบายน้ำ</strong><small id="tw-watergate-meta">ระดับน้ำหน้า/ท้ายประตู</small></span>
                 <input id="tw-watergate-toggle" type="checkbox" /><span class="switch" aria-hidden="true"></span>
               </label>
+              </details>
             </div>
-          </section>
-          <section aria-labelledby="radar-title">
-            <div class="section-heading compact">
-              <h2 id="radar-title">ช่วงเวลาเรดาร์</h2>
-              <span id="radar-time" class="time-badge">—</span>
-            </div>
-            <input id="radar-range" class="timeline" type="range" min="0" max="0" value="0" aria-label="เลือกช่วงเวลาเรดาร์" />
-            <div class="timeline-labels"><span>ย้อนหลัง</span><span>ล่าสุด</span></div>
-            <p class="section-help">ภาพเรดาร์ย้อนหลัง ไม่ใช่พยากรณ์ฝน</p>
-            <button id="radar-play" class="primary-button" type="button"><span>▶</span> เล่นภาพเคลื่อนไหว</button>
           </section>
           <section aria-labelledby="selected-title">
             <div class="section-heading compact"><h2 id="selected-title">ข้อมูล ณ จุดที่เลือก</h2></div>
@@ -128,16 +202,34 @@
             </div>
           </section>
           <section class="legend" aria-labelledby="legend-title">
-            <div class="section-heading compact"><h2 id="legend-title">สัญลักษณ์จุด ปภ.</h2></div>
+            <details class="legend-details" data-remember="legend">
+            <summary><h2 id="legend-title" tabindex="-1">คำอธิบายสัญลักษณ์</h2><span class="legend-summary-hint">ประเภทข้อมูล · ระดับ · วิธีนับ</span></summary>
+            <h3 class="legend-subhead">ประเภทข้อมูล</h3>
             <div class="legend-grid">
-              <span><i style="--legend:#36c98f">○</i>ปกติ</span>
-              <span><i style="--legend:#9bd653">·</i>เฝ้าระวังต่ำ</span>
-              <span><i style="--legend:#f1c84b">≈</i>เฝ้าระวัง</span>
-              <span><i style="--legend:#ff8a3d">▲</i>สูง</span>
-              <span><i style="--legend:#ff4d61">!</i>วิกฤต</span>
-              <span><i style="--legend:#8999a6">?</i>ไม่มีข้อมูล</span>
+              <span><i class="layer-symbol radar mini"><svg class="icon"><use href="#i-radar"/></svg></i>เรดาร์ฝน (RainViewer)</span>
+              <span><i class="layer-symbol flood mini"><svg class="icon"><use href="#i-satellite"/></svg></i>น้ำท่วมจากภาพดาวเทียม (GISTDA)</span>
+              <span><i class="layer-symbol freq mini"><svg class="icon"><use href="#i-history"/></svg></i>พื้นที่น้ำท่วมซ้ำซาก (GISTDA)</span>
+              <span><i class="layer-symbol dam mini"><svg class="icon"><use href="#i-dam"/></svg></i>เขื่อนขนาดใหญ่ (กรมชลประทาน)</span>
+              <span><i class="layer-symbol station mini"><svg class="icon"><use href="#i-pin-alert"/></svg></i>จุดเฝ้าระวัง (ปภ.)</span>
+              <span><i class="layer-symbol river mini"><svg class="icon"><use href="#i-gauge"/></svg></i>ระดับน้ำแม่น้ำ (ThaiWater)</span>
+              <span><i class="layer-symbol rain mini"><svg class="icon"><use href="#i-rain"/></svg></i>ฝน 24 ชม. (ThaiWater)</span>
+              <span><i class="layer-symbol canal mini"><svg class="icon"><use href="#i-canal"/></svg></i>ระดับน้ำคลอง (ThaiWater)</span>
+              <span><i class="layer-symbol gate mini"><svg class="icon"><use href="#i-gate"/></svg></i>ประตูระบายน้ำ (ThaiWater)</span>
             </div>
-            <p class="section-help">ชั้น ThaiWater ใช้สีตามเกณฑ์รายชั้น · เปิดจุดเพื่อดูค่าและแหล่งข้อมูล</p>
+            <h3 class="legend-subhead">ระดับสถานการณ์</h3>
+            <div class="legend-grid">
+              <span><i class="sev-badge" style="--marker:#36c98f"><svg class="sev"><use href="#sev-normal"/></svg></i>ปกติ</span>
+              <span><i class="sev-badge" style="--marker:#9bd653"><svg class="sev"><use href="#sev-low"/></svg></i>เฝ้าระวังต่ำ</span>
+              <span><i class="sev-badge" style="--marker:#f1c84b"><svg class="sev"><use href="#sev-moderate"/></svg></i>เฝ้าระวัง</span>
+              <span><i class="sev-badge" style="--marker:#ff8a3d"><svg class="sev"><use href="#sev-high"/></svg></i>สูง</span>
+              <span><i class="sev-badge" style="--marker:#ff4d61"><svg class="sev"><use href="#sev-critical"/></svg></i>วิกฤต</span>
+              <span><i class="sev-badge" style="--marker:#8999a6"><svg class="sev"><use href="#sev-unknown"/></svg></i>ไม่มีข้อมูล</span>
+            </div>
+            <p class="section-help">หมุด ปภ. แสดงสัญลักษณ์ข้างบนในหมุด · สถานี ThaiWater ใช้รูปทรงเดียวกัน: วงกลม = ปกติ/ต่ำ, สามเหลี่ยม = เฝ้าระวัง/สูง, แปดเหลี่ยม = วิกฤต, เส้นประ = ไม่มีข้อมูล · แต่ละแหล่งใช้เกณฑ์ของตัวเอง · ไม่พบจุดเตือนไม่ได้ยืนยันว่าไม่มีน้ำท่วม</p>
+            <p class="section-help">ค่าเริ่มต้นกรองหมุดสถานีให้เหลือจุดถึงเกณฑ์ (สถานีฝนต้อง &gt; 35 มม./24 ชม.) ปิดตัวกรองหมุดในเมนูชั้นภาพบนแผนที่เพื่อดูจุดอื่น · ไม่กรองเขื่อนหรือภาพน้ำท่วม · จุดที่ซ่อนไม่ได้แปลว่าพื้นที่ปลอดภัย</p>
+            <p class="section-help">เขื่อน: สีน้ำเงินและแถบแสดงสัดส่วนความจุ ไม่ใช่ระดับภัย · 100%+ = เกินระดับเก็บกักปกติ · ▲▼ = น้ำเข้ามากหรือน้อยกว่าระบาย</p>
+            <p class="section-help">หมุดที่มีตัวเลข = จุดเฝ้าระวังหลายจุดที่อยู่ใกล้กัน สีและสัญลักษณ์เป็นของจุดที่รุนแรงที่สุดในกลุ่ม กดเพื่อดูรายการ</p>
+            </details>
           </section>
           <p class="notice">ข้อมูลใช้เพื่อเฝ้าระวัง ไม่ใช่ประกาศหรือคำสั่งอพยพจากหน่วยงานรัฐ</p>
         </div>
@@ -146,18 +238,82 @@
         <div id="map" aria-label="แผนที่ติดตามน้ำท่วมประเทศไทย"></div>
         <div id="map-radar-status" class="map-radar-status" role="status">กำลังโหลดเวลาเรดาร์…</div>
         <div class="map-toolbar" aria-label="เครื่องมือแผนที่">
-          <button id="reset-view" type="button" title="กลับไปมุมมองประเทศไทย" aria-label="กลับไปมุมมองประเทศไทย">⌂</button>
+          <button id="reset-view" type="button" title="กลับไปมุมมองประเทศไทย" aria-label="กลับไปมุมมองประเทศไทย"><svg class="icon"><use href="#i-home"/></svg></button>
+          <button id="locate-me" type="button" title="ไปยังตำแหน่งปัจจุบันของฉัน" aria-label="ไปยังตำแหน่งปัจจุบันของฉัน"><svg class="icon"><use href="#i-locate"/></svg></button>
+          <button id="map-layer-toggle" type="button" title="ชั้นภาพและตัวกรองบนแผนที่" aria-label="เปิดชั้นภาพและตัวกรองบนแผนที่" aria-expanded="false" aria-controls="map-layer-panel"><svg class="icon"><use href="#i-layers"/></svg></button>
         </div>
+        <section id="map-layer-panel" class="map-layer-panel" aria-labelledby="map-layer-title" hidden>
+          <h2 id="map-layer-title">ชั้นภาพบนแผนที่</h2>
+          <div class="layer-list">
+            <label class="layer-control" for="radar-toggle">
+              <span class="layer-symbol radar" aria-hidden="true"><svg class="icon"><use href="#i-radar"/></svg></span>
+              <span class="layer-copy"><strong>เรดาร์ฝน</strong><small>ภาพฝนที่ตรวจพบย้อนหลัง</small></span>
+              <input id="radar-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
+            </label>
+            <div class="map-layer-detail" id="radar-controls">
+              <div class="section-heading compact"><span>เลือกเวลาเรดาร์</span><span id="radar-time" class="time-badge">—</span></div>
+              <input id="radar-range" class="timeline" type="range" min="0" max="0" value="0" aria-label="เลือกช่วงเวลาเรดาร์" />
+              <div class="timeline-labels"><span>ย้อนหลัง</span><span>ล่าสุด</span></div>
+              <p class="section-help">ภาพย้อนหลัง ไม่ใช่พยากรณ์ฝน</p>
+              <button id="radar-play" class="primary-button" type="button"><span>▶</span> เล่นภาพเคลื่อนไหว</button>
+            </div>
+            <label class="layer-control" for="flood-toggle">
+              <span class="layer-symbol flood" aria-hidden="true"><svg class="icon"><use href="#i-satellite"/></svg></span>
+              <span class="layer-copy"><strong>น้ำท่วมจากภาพดาวเทียม</strong><small id="flood-meta">GISTDA · กำลังตรวจ…</small></span>
+              <input id="flood-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
+            </label>
+            <div class="layer-option">
+              <label for="flood-window">ภาพน้ำท่วมย้อนหลัง</label>
+              <select id="flood-window">
+                <option value="1day">ย้อนหลัง 1 วัน</option>
+                <option value="3days" selected>ย้อนหลัง 3 วัน</option>
+                <option value="7days">ย้อนหลัง 7 วัน</option>
+                <option value="30days">ย้อนหลัง 30 วัน</option>
+              </select>
+            </div>
+            <label class="layer-control" for="flood-freq-toggle">
+              <span class="layer-symbol freq" aria-hidden="true"><svg class="icon"><use href="#i-history"/></svg></span>
+              <span class="layer-copy"><strong>พื้นที่น้ำท่วมซ้ำซาก</strong><small id="flood-freq-meta">ฟ้า = ท่วมน้อยครั้ง · แดง = ท่วมบ่อย</small></span>
+              <input id="flood-freq-toggle" type="checkbox" /><span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="layer-control" for="risk-only-toggle">
+              <span class="layer-symbol station" aria-hidden="true"><svg class="icon"><use href="#i-alert"/></svg></span>
+              <span class="layer-copy"><strong>กรองหมุด: เฉพาะจุดถึงเกณฑ์</strong><small id="risk-only-meta">ไม่กรองเขื่อนหรือภาพน้ำท่วม</small></span>
+              <input id="risk-only-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
+            </label>
+          </div>
+        </section>
         <button id="map-alert-summary" class="map-alert-summary" type="button">กำลังโหลดจุดเตือน…</button>
+        <section id="dam-panel" class="map-dam-panel" aria-labelledby="dam-title">
+          <button id="dam-panel-toggle" class="map-dam-head" type="button" aria-expanded="true" aria-controls="dam-panel-body">
+            <span id="dam-title">เขื่อนขนาดใหญ่</span>
+            <span id="dam-meta" class="map-dam-meta">กำลังโหลด…</span>
+            <span class="map-dam-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div id="dam-panel-body" class="map-dam-body">
+            <p id="dam-observed" class="source-age">รอข้อมูลกรมชลประทาน</p>
+            <p class="map-dam-unit">ความจุ / ปัจจุบัน หน่วยล้าน ลบ.ม.</p>
+            <div id="dam-list" class="dam-list"></div>
+            <button id="dam-more" class="link-button" type="button" hidden>ดูทั้งหมด</button>
+            <p class="map-dam-help">% เทียบความจุที่ระดับเก็บกักปกติ · แถบน้ำเงินคือสัดส่วนความจุ ไม่ใช่ระดับภัย · ▲ น้ำเข้ามากกว่าระบาย · ภาพ: Wikimedia Commons (ดูเครดิตใน popup)</p>
+          </div>
+        </section>
+        <div class="map-basemap" role="group" aria-label="รูปแบบแผนที่">
+          <button type="button" data-basemap="map" aria-pressed="true">แผนที่</button>
+          <button type="button" data-basemap="satellite" aria-pressed="false">ภาพดาวเทียม</button>
+          <span class="map-basemap-divider" aria-hidden="true"></span>
+          <button id="traffic-toggle" type="button" aria-pressed="false" aria-disabled="true">การจราจร</button>
+        </div>
         <div class="map-hint"><span>คลิกแผนที่</span> เพื่อดูข้อมูลพื้นที่</div>
       </section>
     </main>
     <footer>
       <span>ข้อมูลเพื่อการเฝ้าระวัง</span>
-      <span>Base map © OpenStreetMap · Radar by <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a> · Stations by <a href="https://www.thaiwater.net/" target="_blank" rel="noreferrer">คลังข้อมูลน้ำแห่งชาติ (สสน.)</a></span>
+      <span>Base map © OpenStreetMap / Esri · Flood © GISTDA · Radar by <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a> · Stations by <a href="https://www.thaiwater.net/" target="_blank" rel="noreferrer">คลังข้อมูลน้ำแห่งชาติ (สสน.)</a></span>
     </footer>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/rules.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

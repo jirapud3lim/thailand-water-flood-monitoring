@@ -144,7 +144,9 @@ def test_rain_normalizer_skips_missing_coordinates() -> None:
 def test_canal_stale_station_is_dropped_and_threshold_applied() -> None:
     features = drop_stale(normalize_canals(CANAL_PAYLOAD), max_age_hours=6, now=NOW)
     assert [f["properties"]["name"] for f in features] == ["ค.แสนแสบ"]
-    assert features[0]["properties"]["severity"] == "high"
+    # No bank reading for this station, and its level (1.3) is below critical_level (1.5): normal.
+    assert features[0]["properties"]["severity"] == "normal"
+    assert features[0]["properties"]["bank_clearance_m"] is None
 
 
 def test_watergate_skips_placeholder_rows() -> None:
@@ -170,10 +172,22 @@ def test_rain_severity_follows_tmd_classes(rain, expected) -> None:
     assert rain_severity(rain) == expected
 
 
-def test_canal_severity_falls_back_to_bank_level() -> None:
-    assert canal_severity(2.0, None, None, 1.8) == "critical"
-    assert canal_severity(1.0, None, None, None) == "unknown"
+def test_canal_severity_measures_against_the_physical_bank() -> None:
+    # At or over the bank: critical, regardless of ThaiWater's own warning/critical levels.
+    assert canal_severity(1.0, 0.1, 0.2, 1.0) == "critical"
+    # Within the 0.3 m margin of the bank: high.
+    assert canal_severity(0.8, 0.4, 0.5, 1.0) == "high"
+    # Over ThaiWater's "critical_level" but still far below the bank: not an alert (เฝ้าระวังต่ำ).
+    assert canal_severity(0.5, 0.1, 0.2, 1.0) == "low"
+    # No bank reading (or bank <= 0): can't judge against the bank, fall back to the low step.
+    assert canal_severity(1.6, 1.2, 1.5, None) == "low"
+    assert canal_severity(1.6, 1.2, 1.5, 0) == "low"
+    # Below every threshold: normal.
     assert canal_severity(0.5, 1.2, 1.5, None) == "normal"
+    assert canal_severity(0.5, 1.2, 1.5, 2.0) == "normal"
+    # No water level reading, or no thresholds at all: unknown.
+    assert canal_severity(None, 1.2, 1.5, 2.0) == "unknown"
+    assert canal_severity(1.0, None, None, None) == "unknown"
 
 
 def test_filter_bbox() -> None:
