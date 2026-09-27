@@ -14,11 +14,12 @@ from backend.app.services.gistda import FLOOD_WINDOWS, TILE_PATHS, fetch_gistda_
 from backend.app.services.thaiwater import LAYERS, drop_stale, fetch_thaiwater_layer
 from backend.app.services.provinces import normalize_province, province as find_province, provinces
 from backend.app.services.twins import link_river_twins
-from backend.app.services import tmd
+from backend.app.services import radar_tiles, tmd
 from backend.app.services.dam_photos import fetch_dam_photos
 from backend.app.services.local_news import fetch_local_news
 from backend.app.services.local_social import fetch_official_video_feed, for_province as social_for_province
 from backend.app.services.traffic import MAX_ZOOM as TRAFFIC_MAX_ZOOM, fetch_traffic_tile
+from backend.app.services.terrain_tiles import MAX_ZOOM as TERRAIN_MAX_ZOOM, fetch_terrain_tile
 from backend.app.services.upstreams import (
     fetch_dams,
     fetch_flood_points,
@@ -192,6 +193,40 @@ async def radar_latest(request: Request, settings: Settings = Depends(get_settin
     return await _cached_response(
         request, "radar:metadata", "radar", lambda: fetch_radar(settings), settings.ttl("radar"),
     )
+
+
+@router.get("/radar/tiles/{frame}/{z}/{x}/{y}.png")
+async def radar_tile(
+    frame: str,
+    z: int = Path(ge=0, le=radar_tiles.MAX_ZOOM),
+    x: int = Path(ge=0),
+    y: int = Path(ge=0),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """RainViewer radar tile via the shared server cache (see services/radar_tiles.py).
+
+    Only frames RainViewer currently lists are served, so this is not an open proxy.
+    """
+    if not radar_tiles.FRAME_RE.match(frame):
+        raise HTTPException(status_code=422, detail="Bad frame id")
+    if x >= 2**z or y >= 2**z:
+        raise HTTPException(status_code=422, detail="Tile x/y out of range for zoom")
+    try:
+        metadata = (await cache.load("radar:metadata", lambda: fetch_radar(settings), settings.ttl("radar"))).value
+    except Exception:
+        raise HTTPException(status_code=502, detail="Radar metadata unavailable")
+    path = radar_tiles.current_frames(metadata).get(frame)
+    if not path:
+        raise HTTPException(status_code=404, detail="Unknown or expired radar frame")
+    try:
+        content = await radar_tiles.fetch_radar_tile(metadata.get("host") or "", path, z, x, y, settings)
+    except radar_tiles.RateLimited as error:
+        raise HTTPException(status_code=503, detail=str(error), headers={"Retry-After": "30"})
+    except (httpx.HTTPError, OSError) as error:
+        status = error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+        raise HTTPException(status_code=502, detail=f"Radar upstream failed ({status or type(error).__name__})")
+    # A past frame's image never changes; it drops out of RainViewer's list after ~2 hours.
+    return Response(content, media_type="image/png", headers={"Cache-Control": "public, max-age=7200, immutable"})
 
 
 @router.get("/dams")
@@ -369,6 +404,24 @@ async def thaiwater_layer(
 async def traffic_status(settings: Settings = Depends(get_settings)) -> dict:
     """Whether the traffic tile proxy has a key; the map hides traffic when it does not."""
     return {"configured": bool(settings.tomtom_api_key), "provider": "TomTom Traffic Flow"}
+
+
+@router.get("/terrain/tiles/{z}/{x}/{y}.png")
+async def terrain_tile(
+    z: int = Path(ge=0, le=TERRAIN_MAX_ZOOM),
+    x: int = Path(ge=0),
+    y: int = Path(ge=0),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Static Terrarium PNG for the optional, non-risk elevation map."""
+    if x >= 1 << z or y >= 1 << z:
+        raise HTTPException(status_code=422, detail="Tile coordinates out of range")
+    try:
+        content = await fetch_terrain_tile(z, x, y, settings)
+    except Exception as error:
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        raise HTTPException(status_code=502, detail=f"Terrain tile failed ({status or type(error).__name__})") from error
+    return Response(content, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/traffic/tiles/{z}/{x}/{y}.png")

@@ -25,10 +25,16 @@ MEDIA = "{http://search.yahoo.com/mrss/}"
 MAX_FEED_BYTES = 2_000_000
 MAX_AGE = timedelta(days=7)
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+SOCIAL_TOPIC = re.compile(f"{TOPIC.pattern}|สถานการณ์น้ำ|เฝ้าระวังน้ำ")
 PLACE_ALIASES = {
     "กรุงเทพมหานคร": ("กรุงเทพมหานคร", "กรุงเทพฯ", "กทม."),
     "พระนครศรีอยุธยา": ("พระนครศรีอยุธยา", "อยุธยา"),
     "นครราชสีมา": ("นครราชสีมา", "โคราช"),
+    # These bare names are common words or river names; require a location cue.
+    "เลย": ("จังหวัดเลย", "จ.เลย", "เมืองเลย"),
+    "แพร่": ("จังหวัดแพร่", "จ.แพร่", "เมืองแพร่"),
+    "ตาก": ("จังหวัดตาก", "จ.ตาก", "เมืองตาก"),
+    "น่าน": ("จังหวัดน่าน", "จ.น่าน", "เมืองน่าน"),
 }
 
 
@@ -62,7 +68,7 @@ async def fetch_official_video_feed(settings: Settings) -> list[dict]:
             continue
         title = (entry.findtext(f"{ATOM}title") or "").strip()[:240]
         description = (entry.findtext(f"{MEDIA}group/{MEDIA}description") or "").strip()[:800]
-        if not title or not TOPIC.search(f"{title} {description[:300]}"):
+        if not title or not SOCIAL_TOPIC.search(f"{title} {description[:300]}"):
             continue
         seen.add(video_id)
         videos.append({

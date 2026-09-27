@@ -1,28 +1,87 @@
-const map = L.map("map", { preferCanvas: true }).setView([13.2, 101.2], 6);
+const map = L.map("map", { preferCanvas: true });
+// The rectangle limits panning and API queries; the polygon below cuts imagery to the border.
+const THAILAND_BOUNDS = L.latLngBounds([5, 97], [21, 106]);
+map.setMaxBounds(THAILAND_BOUNDS);
+map.options.maxBoundsViscosity = 1;
+const tileCountryCache = new Map();
+const ThailandTileLayer = L.TileLayer.extend({
+  _isValidTile(coords) {
+    if (!L.TileLayer.prototype._isValidTile.call(this, coords)) return false;
+    const size = this.getTileSize().x;
+    const key = `${size}/${coords.z}/${coords.x}/${coords.y}`;
+    if (tileCountryCache.has(key)) return tileCountryCache.get(key);
+    const bounds = this._tileCoordsToBounds(coords);
+    const visible = window.ThailandClip.intersectsRect([
+      bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth(),
+    ]);
+    if (tileCountryCache.size > 5000) tileCountryCache.clear();
+    tileCountryCache.set(key, visible);
+    return visible;
+  },
+});
+function thailandViewport() {
+  const view = map.getBounds();
+  return {
+    min_lon: Math.max(view.getWest(), THAILAND_BOUNDS.getWest()),
+    min_lat: Math.max(view.getSouth(), THAILAND_BOUNDS.getSouth()),
+    max_lon: Math.min(view.getEast(), THAILAND_BOUNDS.getEast()),
+    max_lat: Math.min(view.getNorth(), THAILAND_BOUNDS.getNorth()),
+  };
+}
+// The map is full-bleed: on desktop the control panel floats over its left edge, on phones a
+// bottom sheet covers its lower part. Views, fits and popups keep clear of whichever covers it.
+const HOME = { center: [13.2, 101.2], zoom: 6 };
+const panelInset = () => (window.innerWidth > 820 ? (document.querySelector("#sidebar")?.offsetWidth || 0) + 24 : 0);
+const sheetInset = () => (window.innerWidth <= 820 ? Math.round(Math.min(232, window.innerHeight * 0.42)) : 0);
+function offsetCenter(latlng, zoom) {
+  const shift = L.point(panelInset() / 2, -sheetInset() / 2);
+  return map.unproject(map.project(latlng, zoom).subtract(shift), zoom);
+}
+map.setView(offsetCenter(HOME.center, HOME.zoom), HOME.zoom);
+function syncPopupPadding() {
+  L.Popup.prototype.options.autoPanPaddingTopLeft = [panelInset() + 8, 12];
+  L.Popup.prototype.options.autoPanPaddingBottomRight = [12, sheetInset() + 12];
+}
+syncPopupPadding();
+window.addEventListener("resize", syncPopupPadding);
+// Source credits live in the map's attribution line instead of a separate footer bar.
+map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noreferrer">Leaflet</a>');
+map.attributionControl.addAttribution('<a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a> · <a href="https://www.thaiwater.net/" target="_blank" rel="noreferrer">ThaiWater</a> · ปภ. · กรมชลประทาน');
+map.attributionControl.addAttribution('ขอบเขต: <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/" target="_blank" rel="noreferrer">Natural Earth 1:10m</a>');
 // One canvas for every canvas-drawn layer (ThaiWater stations, GISTDA cells). Leaflet does not
 // pass clicks down to a lower canvas, so stacked canvases left the lower layers' markers
 // without popups. Draw order inside this canvas is managed by raiseStationLayers().
 map.createPane("stations").style.zIndex = 450;
 const stationRenderer = L.canvas({ padding: 0.3, pane: "stations" });
+// Opaque inverse polygon hides non-Thai pixels within border-crossing tiles. It sits above
+// raster layers but below station markers, so no external raster needs CORS/canvas processing.
+map.createPane("country-mask").style.zIndex = 430;
+L.polygon(window.ThailandClip.maskRings(), {
+  pane: "country-mask", renderer: L.svg({ pane: "country-mask" }),
+  stroke: false, fillColor: "#07131d", fillOpacity: 1, fillRule: "evenodd", interactive: false,
+}).addTo(map);
 // Base maps sit at zIndex 0 so radar (zIndex 1) and traffic (2) always draw above them.
 const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
 const BASEMAPS = {
-  map: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19, zIndex: 0, attribution: "© OpenStreetMap contributors",
+  map: new ThailandTileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, zIndex: 0, bounds: THAILAND_BOUNDS, noWrap: true,
+    attribution: "© OpenStreetMap contributors",
   }),
   satellite: L.layerGroup([
-    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
-      maxZoom: 19, maxNativeZoom: 18, zIndex: 0,
+    new ThailandTileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19, maxNativeZoom: 18, zIndex: 0, bounds: THAILAND_BOUNDS, noWrap: true,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
     }),
     // Place and boundary labels, since imagery alone has no names.
-    L.tileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, {
-      maxZoom: 19, maxNativeZoom: 18, zIndex: 0, attribution: "Labels © Esri",
+    new ThailandTileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19, maxNativeZoom: 18, zIndex: 0, bounds: THAILAND_BOUNDS, noWrap: true,
+      attribution: "Labels © Esri",
     }),
   ]),
 };
-const trafficLayer = L.tileLayer("/api/v1/traffic/tiles/{z}/{x}/{y}.png", {
-  maxZoom: 19, maxNativeZoom: 18, zIndex: 2, opacity: 0.85,
+const trafficLayer = new ThailandTileLayer("/api/v1/traffic/tiles/{z}/{x}/{y}.png", {
+  maxZoom: 19, maxNativeZoom: 18, zIndex: 3, opacity: 0.85,
+  bounds: THAILAND_BOUNDS, noWrap: true,
   attribution: 'Traffic © <a href="https://www.tomtom.com/" target="_blank" rel="noreferrer">TomTom</a>',
 });
 const storage = {
@@ -34,10 +93,10 @@ BASEMAPS[activeBasemap].addTo(map);
 
 const MARKER_MODE_KEY = "marker-mode";
 const state = {
-  radarFrames: [], radarHost: "", radarLayer: null, radarVisibleLayer: null,
+  radarFrames: [],
   damLayer: L.layerGroup(), floodPointLayer: L.layerGroup(), timer: null,
   damCount: 0, floodAllFeatures: [],
-  radarTransitionId: 0, floodRequestId: 0, inspectRequestId: 0,
+  floodRequestId: 0, inspectRequestId: 0,
   areaForecastRequestId: 0, areaForecastController: null,
   markerByKey: new Map(), pendingFocusKey: null,
   // DPM river gauges that are also ThaiWater stations (backend links them as twin_id).
@@ -51,11 +110,18 @@ const state = {
 const statusEl = document.querySelector("#connection");
 const radarRange = document.querySelector("#radar-range");
 const radarTime = document.querySelector("#radar-time");
+const radarPlay = document.querySelector("#radar-play");
+const radarSpeedEl = document.querySelector("#radar-speed");
+const radarTicksEl = document.querySelector("#radar-ticks");
+const radarLoadEl = document.querySelector("#radar-load");
+const radarBarEl = document.querySelector("#radar-timeline");
 const pointData = document.querySelector("#point-data");
+const terrainToggle = document.querySelector("#terrain-toggle");
+const terrainLegendEl = document.querySelector("#terrain-legend");
+const terrainStatusEl = document.querySelector("#terrain-status");
 const layerCounts = document.querySelector("#layer-counts");
-const damCountEl = document.querySelector("#dam-count");
+const alertBreakdownEl = document.querySelector("#alert-breakdown");
 const alertCountEl = document.querySelector("#alert-count");
-const radarSummaryEl = document.querySelector("#radar-summary");
 const freshnessEl = document.querySelector("#data-freshness");
 const refreshButton = document.querySelector("#refresh-all");
 const sidebarButton = document.querySelector("#sidebar-toggle");
@@ -67,9 +133,9 @@ const mapAlertSummaryEl = document.querySelector("#map-alert-summary");
 const priorityKpiEl = document.querySelector(".priority-kpi");
 const alertCountLabelEl = document.querySelector("#alert-count-label");
 const priorityScopeEl = document.querySelector("#priority-scope");
-const localNewsSectionEl = document.querySelector("#local-news-section");
 const localNewsProvinceEl = document.querySelector("#local-news-province");
 const localNewsListEl = document.querySelector("#local-news-list");
+const localNewsSelectEl = document.querySelector("#local-news-select");
 const localSocialSectionEl = document.querySelector("#local-social-section");
 const localSocialProvinceEl = document.querySelector("#local-social-province");
 const localSocialListEl = document.querySelector("#local-social-list");
@@ -80,7 +146,6 @@ const damMoreButton = document.querySelector("#dam-more");
 const mapRadarStatusEl = document.querySelector("#map-radar-status");
 const mapLayerPanelEl = document.querySelector("#map-layer-panel");
 const mapLayerToggleEl = document.querySelector("#map-layer-toggle");
-const radarControlsEl = document.querySelector("#radar-controls");
 const selectedSectionEl = document.querySelector("#selected-title").closest("section");
 const prioritySectionEl = document.querySelector("#priority-title").closest("section");
 const areaForecastFormEl = document.querySelector("#area-forecast-form");
@@ -200,10 +265,13 @@ function setSidebarOpen(open, focusSection = null, { returnTo = null } = {}) {
   document.body.classList.toggle("sidebar-open", open);
   sidebarButton.setAttribute("aria-expanded", String(open));
   sidebarButton.setAttribute("aria-label", open ? "ปิดเมนู" : "เปิดเมนู");
+  const handle = document.querySelector("#sheet-handle");
+  handle.setAttribute("aria-expanded", String(open));
+  handle.setAttribute("aria-label", open ? "ย่อแผงข้อมูล" : "ขยายแผงข้อมูล");
   if (!open && returnTo) state.sidebarReturnTo = returnTo;
   if (open && focusSection) focusSection.scrollIntoView({ behavior: "smooth", block: "start" });
   if (isPhone() && open && !wasOpen) {
-    const target = focusSection?.querySelector("h2") || (state.sidebarReturnTo?.isConnected ? state.sidebarReturnTo : null);
+    const target = focusSection?.querySelector("h2") || returnTarget();
     setTimeout(() => target?.focus({ preventScroll: !focusSection }), 280);
   } else if (isPhone() && !open && wasOpen && document.activeElement?.closest("#sidebar")) {
     sidebarButton.focus();
@@ -232,6 +300,15 @@ for (const details of document.querySelectorAll("details[data-remember]")) {
   details.addEventListener("toggle", () => storage.set(key, details.open ? "1" : "0"));
 }
 
+// The list may have been re-rendered while the user looked at the map (a popup's autoPan moves
+// the map); fall back to the new button for the same station.
+function returnTarget() {
+  const last = state.sidebarReturnTo;
+  if (!last) return null;
+  if (last.isConnected) return last;
+  return last.dataset.key ? priorityListEl.querySelector(`.priority-item[data-key="${CSS.escape(last.dataset.key)}"]`) : null;
+}
+
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (!statusDetailEl.hidden) { setStatusDetailOpen(false); statusEl.focus(); return; }
@@ -239,64 +316,236 @@ document.addEventListener("keydown", (event) => {
   if (isPhone() && document.body.classList.contains("sidebar-open")) setSidebarOpen(false);
 });
 
-function showRadar(index) {
-  const frame = state.radarFrames[index];
-  if (!frame) return;
-  const transitionId = ++state.radarTransitionId;
-  const oldLayer = state.radarVisibleLayer;
-  const url = `${state.radarHost}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-  const nextLayer = L.tileLayer(url, { opacity: 0, maxNativeZoom: 7, maxZoom: 19 });
-  state.radarLayer = nextLayer;
-  const frameTime = new Date(frame.time * 1000);
-  radarTime.textContent = frameTime.toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
-  radarSummaryEl.textContent = frameTime.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-  mapRadarStatusEl.textContent = `เรดาร์ย้อนหลัง · ${frameTime.toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Bangkok" })} น. (ไทย)`;
+// ---------------------------------------------------------------- optional elevation overlay (Mapzen Terrarium)
+// Colour is absolute terrain elevation, not local high/low or a flood-risk category.
+// Thailand uses coarse GMTED at low zoom and mainly SRTM (~30 m) when zoomed in.
+const TerrainTileLayer = ThailandTileLayer.extend({
+  createTile(coords, done) {
+    const tile = document.createElement("canvas");
+    tile.width = tile.height = window.Terrain.TILE_SIZE;
+    tile.className = "terrain-tile";
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const context = tile.getContext("2d", { willReadFrequently: true });
+        context.drawImage(image, 0, 0);
+        const source = context.getImageData(0, 0, tile.width, tile.height).data;
+        const tinted = context.createImageData(tile.width, tile.height);
+        for (let i = 0; i < source.length; i += 4) {
+          if (!source[i + 3]) continue;
+          const elevation = window.Terrain.decode(source[i], source[i + 1], source[i + 2]);
+          const colour = window.Terrain.colorForElevation(elevation);
+          if (!colour) continue;
+          tinted.data[i] = colour[0];
+          tinted.data[i + 1] = colour[1];
+          tinted.data[i + 2] = colour[2];
+          tinted.data[i + 3] = 205;
+        }
+        context.putImageData(tinted, 0, 0);
+        done(null, tile);
+      } catch (error) { done(error, tile); }
+    };
+    image.onerror = () => done(new Error("Terrain tile unavailable"), tile);
+    image.src = this.getTileUrl(coords);
+    return tile;
+  },
+});
+state.terrainLayer = new TerrainTileLayer("/api/v1/terrain/tiles/{z}/{x}/{y}.png", {
+  maxZoom: 19, maxNativeZoom: window.Terrain.SAMPLE_ZOOM, zIndex: 1, opacity: 0.72, keepBuffer: 1,
+  bounds: THAILAND_BOUNDS, noWrap: true,
+  attribution: 'Terrain: <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noreferrer">Mapzen</a> · SRTM/GMTED: USGS · ETOPO1: NOAA',
+});
+state.terrainHadError = false;
+state.terrainLayer.on("loading", () => {
+  state.terrainHadError = false;
+  if (terrainToggle.checked) terrainStatusEl.textContent = "กำลังโหลดความสูงภูมิประเทศ…";
+});
+state.terrainLayer.on("tileerror", () => {
+  state.terrainHadError = true;
+  if (terrainToggle.checked) terrainStatusEl.textContent = "บางส่วนโหลดไม่สำเร็จ · ลองปิดแล้วเปิดใหม่";
+});
+state.terrainLayer.on("load", () => {
+  if (terrainToggle.checked && !state.terrainHadError) terrainStatusEl.textContent = "เมตรโดยประมาณ · ไม่ใช่ระดับเสี่ยงน้ำท่วม";
+});
 
-  if (!document.querySelector("#radar-toggle").checked) {
-    nextLayer.setOpacity(0.58);
-    if (oldLayer && map.hasLayer(oldLayer)) map.removeLayer(oldLayer);
-    state.radarVisibleLayer = nextLayer;
+function sampleTerrainAt(lat, lon) {
+  const position = window.Terrain.tileForLatLng(lat, lon);
+  if (!position) return Promise.resolve(null);
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const timeout = setTimeout(() => { image.onload = image.onerror = null; reject(new Error("Terrain tile timeout")); }, 8000);
+    image.onload = () => {
+      clearTimeout(timeout);
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = window.Terrain.TILE_SIZE;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        context.drawImage(image, 0, 0);
+        const pixel = context.getImageData(position.pixelX, position.pixelY, 1, 1).data;
+        resolve(window.Terrain.samplePixel(pixel, 0, 0, 1));
+      } catch (error) { reject(error); }
+    };
+    image.onerror = () => { clearTimeout(timeout); reject(new Error("Terrain tile unavailable")); };
+    image.src = `/api/v1/terrain/tiles/${position.z}/${position.x}/${position.y}.png`;
+  });
+}
+
+terrainToggle.addEventListener("change", () => {
+  const enabled = terrainToggle.checked;
+  terrainLegendEl.hidden = !enabled;
+  if (enabled) state.terrainLayer.addTo(map); else map.removeLayer(state.terrainLayer);
+  if (!enabled) terrainStatusEl.textContent = "เมตรโดยประมาณ · ไม่ใช่ระดับเสี่ยงน้ำท่วม";
+  if (state.selectedLatLng) inspectPoint({ latlng: state.selectedLatLng });
+});
+
+// ---------------------------------------------------------------- radar player (Windy-style)
+// Every frame is its own tile layer, preloaded newest-first and kept on the map at opacity 0, so
+// playing is a CSS cross-fade between layers that are already there: no reload, no blank flash.
+// Tiles come through /api/v1/radar/tiles (server cache), because RainViewer allows only
+// 100 requests per IP per minute and 13 frames x a screen of tiles is more than that.
+// Radar is context, not the alert: kept light so station marks read through it.
+const RADAR_OPACITY = 0.45;
+const RADAR_STEP_MS = 600;       // per frame at 1x
+const RADAR_HOLD_MS = 1600;      // rest on the latest frame before looping
+const RADAR_SPEEDS = [1, 2, 0.5];
+// 512 px tiles requested one zoom lower (like the GISTDA layer): the free tier's zoom-7 limit
+// is full resolution up to map zoom 8; deeper zooms are upscaled (and softened).
+const RADAR_NATIVE_ZOOM = 8;
+const RADAR_RETRIES = 3;         // a 503 means the server's upstream budget is busy: retry later
+state.radar = { frames: [], layers: [], index: -1, playing: false, speed: 1, timer: null, loaded: new Set() };
+
+const radarClock = (frame) => new Date(frame.time * 1000).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit" });
+
+function makeRadarLayer(id) {
+  const layer = new ThailandTileLayer(`/api/v1/radar/tiles/${id}/{z}/{x}/{y}.png`, {
+    opacity: 0, tileSize: 512, zoomOffset: -1, minNativeZoom: 1, maxNativeZoom: RADAR_NATIVE_ZOOM, maxZoom: 19,
+    zIndex: 2, className: "radar-frame", keepBuffer: 1, bounds: THAILAND_BOUNDS, noWrap: true,
+  });
+  layer.frameId = id;
+  // Cold server cache + RainViewer's per-minute limit can return 503; ask again a little later
+  // instead of leaving a hole in the frame.
+  layer.on("tileerror", ({ tile }) => {
+    const attempt = Number(tile.dataset.retry || 0) + 1;
+    if (attempt > RADAR_RETRIES) return;
+    tile.dataset.retry = attempt;
+    setTimeout(() => { tile.src = `${tile.src.split("?")[0]}?retry=${attempt}`; }, 8000 * attempt);
+  });
+  layer.on("loading", () => { state.radar.loaded.delete(id); renderRadarLoad(); });
+  layer.on("load", () => { state.radar.loaded.add(id); renderRadarLoad(); preloadNextRadar(); });
+  return layer;
+}
+
+// Newest first, one layer at a time: the first frame people see loads before the history does.
+function preloadNextRadar() {
+  if (!radarToggle.checked) return;
+  const layer = [...state.radar.layers].reverse().find((l) => !map.hasLayer(l));
+  if (layer) layer.addTo(map);
+}
+
+function renderRadarLoad() {
+  const total = state.radar.layers.length;
+  const ready = state.radar.layers.filter((l) => state.radar.loaded.has(l.frameId)).length;
+  radarLoadEl.hidden = !total || ready >= total;
+  radarLoadEl.textContent = `โหลดภาพ ${ready}/${total}`;
+}
+
+function renderRadarTicks() {
+  const frames = state.radar.frames;
+  radarTicksEl.innerHTML = frames.map((frame, i) => {
+    const left = frames.length > 1 ? (i / (frames.length - 1)) * 100 : 0;
+    const label = new Date(frame.time * 1000).getUTCMinutes() === 0 ? `<b>${radarClock(frame)}</b>` : "";
+    return `<i style="left:${left}%">${label}</i>`;
+  }).join("");
+}
+
+function showRadarFrame(index) {
+  const r = state.radar;
+  if (!r.frames.length) return;
+  r.index = Math.max(0, Math.min(index, r.frames.length - 1));
+  r.layers.forEach((layer, i) => {
+    if (i === r.index && radarToggle.checked && !map.hasLayer(layer)) layer.addTo(map);
+    if (map.hasLayer(layer)) layer.setOpacity(i === r.index ? RADAR_OPACITY : 0);
+  });
+  const frame = r.frames[r.index];
+  const latest = r.index === r.frames.length - 1;
+  radarRange.value = r.index;
+  radarRange.setAttribute("aria-valuetext", `${radarClock(frame)} น.${latest ? " (ล่าสุด)" : ""}`);
+  radarTime.textContent = `${radarClock(frame)}${latest ? " · ล่าสุด" : ""}`;
+  radarTime.style.left = `${r.frames.length > 1 ? (r.index / (r.frames.length - 1)) * 100 : 100}%`;
+  mapRadarStatusEl.textContent = `เรดาร์ย้อนหลัง · ${new Date(frame.time * 1000).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Bangkok" })} น. (ไทย)`;
+}
+
+function radarTick() {
+  const r = state.radar;
+  if (!r.playing || !r.frames.length) return;
+  const next = (r.index + 1) % r.frames.length;
+  const layer = r.layers[next];
+  // Wait for a frame that is still loading rather than fading to an empty map.
+  if (!r.loaded.has(layer.frameId)) {
+    if (!map.hasLayer(layer)) layer.addTo(map);
+    r.timer = setTimeout(radarTick, 150);
     return;
   }
+  showRadarFrame(next);
+  r.timer = setTimeout(radarTick, (next === r.frames.length - 1 ? RADAR_HOLD_MS : RADAR_STEP_MS) / r.speed);
+}
 
-  nextLayer.once("load", () => {
-    if (transitionId !== state.radarTransitionId) {
-      if (map.hasLayer(nextLayer)) map.removeLayer(nextLayer);
-      return;
-    }
-    requestAnimationFrame(() => {
-      state.radarVisibleLayer = nextLayer;
-      nextLayer.setOpacity(0.58);
-      if (oldLayer && map.hasLayer(oldLayer)) oldLayer.setOpacity(0);
-      setTimeout(() => {
-        if (oldLayer && map.hasLayer(oldLayer)) map.removeLayer(oldLayer);
-      }, 500);
-    });
-  });
-  nextLayer.addTo(map);
+function setRadarPlaying(on) {
+  const r = state.radar;
+  clearTimeout(r.timer);
+  r.playing = on && r.frames.length > 1 && radarToggle.checked;
+  radarPlay.setAttribute("aria-pressed", String(r.playing));
+  radarPlay.setAttribute("aria-label", r.playing ? "หยุดภาพเคลื่อนไหวเรดาร์" : "เล่นภาพเคลื่อนไหวเรดาร์");
+  radarPlay.querySelector("use").setAttribute("href", r.playing ? "#i-pause" : "#i-play");
+  radarBarEl.classList.toggle("is-playing", r.playing);
+  if (!r.playing) return;
+  if (r.index === r.frames.length - 1) showRadarFrame(0);  // like Windy: play runs from the oldest frame
+  r.timer = setTimeout(radarTick, RADAR_STEP_MS / r.speed);
 }
 
 async function loadRadar() {
   try {
     const result = await getJSON("/api/v1/radar/latest");
-    state.radarHost = result.data.host;
-    state.radarFrames = result.data.radar?.past || [];
-    if (!state.radarFrames.length) {
+    const frames = result.data.radar?.past || [];
+    const r = state.radar;
+    const wasLatest = r.index < 0 || r.index === r.frames.length - 1;
+    const shownId = r.layers[r.index]?.frameId;
+    // Keep layers of frames still listed (already loaded), add new ones, drop expired ones.
+    const byId = new Map(r.layers.map((l) => [l.frameId, l]));
+    const layers = frames.map((f) => { const id = f.path.split("/").pop(); return byId.get(id) || makeRadarLayer(id); });
+    for (const old of r.layers) if (!layers.includes(old)) { map.removeLayer(old); r.loaded.delete(old.frameId); }
+    r.frames = frames;
+    r.layers = layers;
+    state.radarFrames = frames;
+    radarRange.max = Math.max(0, frames.length - 1);
+    renderRadarTicks();
+    if (!frames.length) {
       radarTime.textContent = "ไม่มีภาพ";
-      radarSummaryEl.textContent = "—";
       mapRadarStatusEl.textContent = "เรดาร์ยังไม่มีภาพล่าสุด";
+    } else {
+      const keep = layers.findIndex((l) => l.frameId === shownId);
+      showRadarFrame(wasLatest || keep < 0 ? frames.length - 1 : keep);
     }
-    radarRange.max = Math.max(0, state.radarFrames.length - 1);
-    radarRange.value = radarRange.max;
+    renderRadarLoad();
     updateRadarControls();
-    showRadar(Number(radarRange.value));
+    preloadNextRadar();
     return record(outcome("เรดาร์ฝน", result));
   } catch (error) {
     mapRadarStatusEl.textContent = "โหลดเวลาเรดาร์ไม่สำเร็จ";
+    radarTime.textContent = "โหลดไม่สำเร็จ";
     updateRadarControls();
     return failure("เรดาร์ฝน", error);
   }
 }
+
+// Tiles past zoom 7 are upscaled; a light blur reads as soft rain instead of hard blocks.
+function syncRadarSoftening() {
+  const over = Math.max(0, map.getZoom() - RADAR_NATIVE_ZOOM);
+  map.getContainer().style.setProperty("--radar-blur", `${Math.min(6, over * 1.5)}px`);
+  map.getContainer().classList.toggle("radar-overzoom", over > 0);
+}
+map.on("zoomend", syncRadarSoftening);
+syncRadarSoftening();
 
 // ---------------------------------------------------------------- GISTDA satellite flood
 const FLOOD_SOURCE = "ขอบเขตน้ำท่วม (GISTDA)";
@@ -313,13 +562,13 @@ const satellitePriorityEl = document.querySelector("#satellite-priority");
 
 // GISTDA tiles are 512 px in XYZ order: zoomOffset -1 keeps them at their true scale.
 function gistdaTiles(layer, options) {
-  return L.tileLayer(`/api/v1/gistda/tiles/${layer}/{z}/{x}/{y}.png`, {
+  return new ThailandTileLayer(`/api/v1/gistda/tiles/${layer}/{z}/{x}/{y}.png`, {
     tileSize: 512, zoomOffset: -1, minZoom: 1, maxZoom: 19, maxNativeZoom: 18,
-    attribution: "Flood © GISTDA", ...options,
+    bounds: THAILAND_BOUNDS, noWrap: true, attribution: "Flood © GISTDA", ...options,
   });
 }
-state.floodTiles = gistdaTiles(`flood-${floodWindowSelect.value}`, { zIndex: 3, opacity: 0.85 });
-state.floodFreqTiles = gistdaTiles("flood-freq", { zIndex: 1, opacity: 0.6 });
+state.floodTiles = gistdaTiles(`flood-${floodWindowSelect.value}`, { zIndex: 4, opacity: 0.85 });
+state.floodFreqTiles = gistdaTiles("flood-freq", { zIndex: 2, opacity: 0.6 });
 state.floodCells = L.geoJSON(null, {
   renderer: stationRenderer,
   // Tiles draw the colour; these near-invisible shapes only make cells hoverable/clickable.
@@ -462,10 +711,7 @@ async function loadFlood() {
   }
   const floodWindow = floodWindowSelect.value;
   const detail = map.getZoom() >= FLOOD_DETAIL_ZOOM;
-  const b = map.getBounds();
-  const params = new URLSearchParams({
-    min_lon: b.getWest(), min_lat: b.getSouth(), max_lon: b.getEast(), max_lat: b.getNorth(), window: floodWindow, detail,
-  });
+  const params = new URLSearchParams({ ...thailandViewport(), window: floodWindow, detail });
   try {
     const result = await getJSON(`/api/v1/flood/current?${params}`);
     if (requestId !== state.floodCellRequestId) return null;
@@ -548,7 +794,7 @@ function updateLayerCounts() {
   floodPointMetaEl.textContent = !document.querySelector("#flood-point-toggle").checked ? "ปิดอยู่ · ไม่นับ"
     : failed ? "โหลดไม่สำเร็จ" : c ? layerCountText(c) : "กำลังโหลด…";
   floodPointMetaEl.title = c?.risk.length ? `ต่ำกว่าเกณฑ์: ${severityBreakdown(c.risk)}` : "";
-  if (state.outcomes.get("เขื่อน")?.ok) { damCountEl.textContent = formatNumber(state.damCount, 0); damCountEl.title = ""; }
+
 }
 const floodPointMetaEl = document.querySelector("#flood-point-meta");
 
@@ -626,6 +872,7 @@ function dpmSection(d) {
 
 // `trigger` is the list button: on phones the menu reopens with focus back on it.
 function focusPriority(feature, trigger = null) {
+  state.newsManualProvince = feature.properties.province;
   loadNewsForProvince(feature.properties.province);
   const [lon, lat] = feature.geometry.coordinates;
   const key = floodPointKey(feature);
@@ -667,6 +914,7 @@ state.newsRequestId = 0;
 state.newsProvince = "";
 state.newsLoadedAt = 0;
 state.newsLoading = false;
+state.newsManualProvince = "";
 state.socialRequestId = 0;
 state.socialProvince = "";
 state.socialLoadedAt = 0;
@@ -742,10 +990,16 @@ async function loadNewsForProvince(province) {
     ++state.newsRequestId;
     state.newsProvince = "";
     state.newsLoading = false;
-    localNewsSectionEl.hidden = true;
+    localNewsProvinceEl.textContent = "";
+    localNewsSelectEl.value = "";
+    localNewsListEl.replaceChildren();
+    const prompt = document.createElement("p");
+    prompt.className = "priority-empty";
+    prompt.textContent = "ยังไม่มีจังหวัดที่มีจุดเตือนในข้อมูลล่าสุด · เลือกจังหวัดเพื่อดูข่าวน้ำและฝน";
+    localNewsListEl.append(prompt);
     return;
   }
-  localNewsSectionEl.hidden = false;
+  localNewsSelectEl.value = province;
   if (state.newsProvince === province && (state.newsLoading || Date.now() - state.newsLoadedAt < 5 * 60_000)) return;
   const requestId = ++state.newsRequestId;
   state.newsProvince = province;
@@ -782,6 +1036,16 @@ async function loadNewsForProvince(province) {
       empty.className = "priority-empty";
       empty.textContent = "ไม่พบข่าวน้ำหรือฝนในรายการล่าสุดที่ระบุจังหวัดนี้ · ไม่ได้หมายความว่าพื้นที่ปลอดภัย";
       localNewsListEl.append(empty);
+      const source = result.data.source_url ? new URL(result.data.source_url) : null;
+      if (source?.protocol === "https:" && (source.hostname === "www.prd.go.th" || source.hostname.endsWith(".prd.go.th"))) {
+        const link = document.createElement("a");
+        link.className = "local-news-item";
+        link.href = source.href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "ดูข่าวทั้งหมดจากกรมประชาสัมพันธ์จังหวัดนี้";
+        localNewsListEl.append(link);
+      }
     }
     if (result.stale) localNewsProvinceEl.textContent = `จ.${province} · ข่าวสำรอง`;
   } catch (error) {
@@ -801,6 +1065,15 @@ function scopeLabel() {
   return state.scope ? `ใน จ.${state.scope}` : "ในจอ";
 }
 
+// "วิกฤต 44 · สูง 16 · เฝ้าระวัง 61": the split that decides what to look at first.
+function renderAlertBreakdown(alerts) {
+  if (!alerts) { alertBreakdownEl.replaceChildren(); return; }
+  const counts = { critical: 0, high: 0, moderate: 0 };
+  for (const f of alerts) if (f.properties.severity in counts) counts[f.properties.severity] += 1;
+  alertBreakdownEl.innerHTML = Object.entries(counts).map(([severity, n]) =>
+    `<span class="sev-chip${n ? "" : " zero"}" style="--marker:${severityColors[severity]}">${severityIcon(severity)}${severityLabels[severity]} <b>${formatNumber(n, 0)}</b></span>`).join("");
+}
+
 function setKpiNote(text, tone = "") {
   priorityObservedEl.textContent = text;
   priorityObservedEl.classList.toggle("warn", tone === "warn");
@@ -818,8 +1091,8 @@ function renderPriority(alerts, observedAt, stale) {
   setKpiNote([
     observedAt ? `ข้อมูลสถานี ${formatObserved(observedAt)}` : "ไม่ทราบเวลาข้อมูลสถานี",
     stale ? "ข้อมูลสำรอง (อาจไม่ใช่ล่าสุด)" : "",
-    n ? "" : "ไม่พบจุดถึงเกณฑ์ · ไม่ยืนยันว่าปลอดภัย",
   ].filter(Boolean).join(" · "), stale ? "warn" : "");
+  renderAlertBreakdown(alerts);
   mapAlertSummaryEl.textContent = `${n} จุดเตือน${scopeLabel()}`;
   mapAlertSummaryEl.classList.toggle("has-alerts", n > 0);
   mapAlertSummaryEl.setAttribute("aria-label", `${n} จุดเตือน${scopeLabel()} เปิดรายการจุดเตือน`);
@@ -827,7 +1100,7 @@ function renderPriority(alerts, observedAt, stale) {
   if (!n) {
     const empty = document.createElement("p");
     empty.className = "priority-empty";
-    empty.innerHTML = `${icon("pin-alert")}<span>ไม่พบสถานีถึงระดับเตือน${state.scope ? `ใน จ.${escapeHtml(state.scope)}` : "ในพื้นที่ที่เห็น"} · ข้อมูลนี้ไม่ยืนยันว่าพื้นที่ปลอดน้ำท่วม</span>`;
+    empty.innerHTML = `${icon("pin-alert")}<span>ไม่พบสถานีถึงระดับเตือน${state.scope ? `ใน จ.${escapeHtml(state.scope)}` : "ในพื้นที่ที่เห็น"} (ไม่ได้แปลว่าปลอดภัย)</span>`;
     priorityListEl.append(empty);
     return;
   }
@@ -851,6 +1124,7 @@ function renderPriority(alerts, observedAt, stale) {
         <small>${escapeHtml(p.province)} · ${escapeHtml(formatObserved(p.observed_at))}${p.origin === "thaiwater" ? " · ThaiWater" : ""}</small></span>
         <span class="priority-level">${severityLabels[p.severity]}</span>`;
       button.setAttribute("aria-label", `${p.name} ${label} ระดับ${severityLabels[p.severity]} กดเพื่อดูบนแผนที่`);
+      button.dataset.key = feature.properties.tw_id ? `tw:${feature.properties.tw_id}` : floodPointKey(feature);
       button.addEventListener("click", () => focusPriority(feature, button));
       priorityListEl.append(button);
     }
@@ -1069,22 +1343,40 @@ function renderScopeOptions(byProvince) {
   priorityScopeEl.value = state.scope;
 }
 
+function renderNewsOptions() {
+  const current = localNewsSelectEl.value;
+  localNewsSelectEl.replaceChildren(new Option("เลือกจังหวัด", ""));
+  const names = state.provinces.length ? state.provinces.map((row) => row.name) :
+    (state.lastByProvince || []).map((row) => row.name);
+  for (const name of names) localNewsSelectEl.add(new Option(name, name));
+  localNewsSelectEl.value = current || state.newsProvince;
+}
+
+localNewsSelectEl.addEventListener("change", () => {
+  state.newsManualProvince = localNewsSelectEl.value;
+  loadNewsForProvince(localNewsSelectEl.value);
+});
+
 async function loadAlerts() {
   const requestId = ++state.alertsRequestId;
   const params = new URLSearchParams();
   if (state.scope) {
     params.set("province", state.scope);
   } else {
-    const b = map.getBounds();
-    for (const [k, v] of Object.entries({ min_lon: b.getWest(), min_lat: b.getSouth(), max_lon: b.getEast(), max_lat: b.getNorth() })) params.set(k, v);
+    for (const [k, v] of Object.entries(thailandViewport())) params.set(k, v);
   }
   try {
     const result = await getJSON(`/api/v1/alerts?${params}`);
     if (requestId !== state.alertsRequestId) return null;
     if (state.provinces.length) renderScopeOptions(result.data.by_province);
+    else state.lastByProvince = result.data.by_province;
+    renderNewsOptions();
     renderPriority(result.data.features, result.meta?.observed_at_max, result.stale);
-    const newsProvince = state.scope && result.data.features.length
-      ? state.scope : result.data.features[0]?.properties?.province;
+    const nationalPriority = [...result.data.by_province]
+      .filter((row) => row.alerts > 0)
+      .sort((a, b) => b.critical - a.critical || b.high - a.high || b.alerts - a.alerts)[0];
+    const newsProvince = state.newsManualProvince || state.scope ||
+      result.data.features[0]?.properties?.province || nationalPriority?.name;
     loadNewsForProvince(newsProvince);
     return null;  // same upstream as flood points; its health is recorded there
   } catch (error) {
@@ -1093,11 +1385,12 @@ async function loadAlerts() {
     priorityKpiEl.classList.remove("has-alerts");
     priorityMetaEl.textContent = "โหลดไม่สำเร็จ";
     setKpiNote("โหลดไม่สำเร็จ · ไม่ทราบจำนวนจุดเตือน", "error");
+    renderAlertBreakdown(null);
     mapAlertSummaryEl.textContent = "จุดเตือน: โหลดไม่สำเร็จ";
     mapAlertSummaryEl.classList.remove("has-alerts");
     priorityListEl.setAttribute("aria-busy", "false");
     priorityListEl.innerHTML = `<p class="priority-empty is-error"><svg class="sev" aria-hidden="true"><use href="#sev-unknown"/></svg><span>โหลดรายการจุดเตือนไม่สำเร็จ · ไม่ทราบสถานการณ์ ไม่ใช่ "ไม่มีจุดเตือน" · กดรีเฟรชเพื่อลองใหม่</span></p>`;
-    loadNewsForProvince(null);
+    if (!state.newsManualProvince && !state.newsProvince) loadNewsForProvince(null);
     console.warn("alerts unavailable", error);
     return null;
   }
@@ -1118,7 +1411,7 @@ function setScope(name) {
   state.scope = name;
   storage.set(SCOPE_STORAGE_KEY, name);
   const pv = state.provinces.find((row) => row.name === name);
-  if (pv?.bbox) map.fitBounds([[pv.bbox[1], pv.bbox[0]], [pv.bbox[3], pv.bbox[2]]], { padding: [16, 16] });
+  if (pv?.bbox) map.fitBounds([[pv.bbox[1], pv.bbox[0]], [pv.bbox[3], pv.bbox[2]]], { paddingTopLeft: [16 + panelInset(), 16], paddingBottomRight: [16, 16 + sheetInset()] });
   loadAlerts();
   loadSatellitePriority();
   renderForecastLine();
@@ -1211,7 +1504,8 @@ function renderDamList() {
   const dams = [...state.damFeatures].sort(damRank);
   damListEl.replaceChildren();
   const top = dams[0]?.properties;
-  damMetaEl.textContent = top ? `${dams.length} เขื่อน · สูงสุด ${top.name.replace(/^เขื่อน/, "")} ${damPercentText(top.percent_storage)}` : `${dams.length} เขื่อน`;
+  const over = dams.filter((f) => f.properties.percent_storage > 100).length;
+  damMetaEl.textContent = [`${dams.length} เขื่อน`, over ? `เกิน 100%: ${over}` : "", top ? `สูงสุด ${top.name.replace(/^เขื่อน/, "")} ${damPercentText(top.percent_storage)}` : ""].filter(Boolean).join(" · ");
   for (const feature of state.damShowAll ? dams : dams.slice(0, DAM_TOP)) {
     const p = feature.properties;
     const trend = damTrend(p);
@@ -1281,7 +1575,11 @@ map.on("popupopen", (event) => {
   }, 320);
 });
 
-const syncZoomDetail = () => map.getContainer().classList.toggle("map-zoom-detail", map.getZoom() >= DAM_DETAIL_ZOOM);
+const DAM_FAR_ZOOM = 7;  // at or below: only dams over 100% keep their % label
+const syncZoomDetail = () => {
+  map.getContainer().classList.toggle("map-zoom-detail", map.getZoom() >= DAM_DETAIL_ZOOM);
+  map.getContainer().classList.toggle("map-zoom-far", map.getZoom() <= DAM_FAR_ZOOM);
+};
 map.on("zoomend", syncZoomDetail);
 syncZoomDetail();
 
@@ -1310,8 +1608,6 @@ async function loadDams() {
     if (document.querySelector("#dam-toggle").checked && !map.hasLayer(state.damLayer)) state.damLayer.addTo(map);
     return record(outcome("เขื่อน", result));
   } catch (error) {
-    damCountEl.textContent = "—";  // unknown, not zero: a failed join must not read as "no dams"
-    damCountEl.title = "โหลดข้อมูลเขื่อนไม่สำเร็จ";
     damMetaEl.textContent = "โหลดไม่สำเร็จ";
     if (!state.damFeatures.length) damListEl.innerHTML = '<p class="priority-empty">โหลดข้อมูลเขื่อนไม่สำเร็จ · ลองรีเฟรชอีกครั้ง</p>';
     const result = failure("เขื่อน", error);
@@ -1465,10 +1761,7 @@ function renderFloodPoints() {
 
 async function loadFloodPoints() {
   const requestId = ++state.floodRequestId;
-  const b = map.getBounds();
-  const params = new URLSearchParams({
-    min_lon: b.getWest(), min_lat: b.getSouth(), max_lon: b.getEast(), max_lat: b.getNorth(),
-  });
+  const params = new URLSearchParams(thailandViewport());
   try {
     const result = await getJSON(`/api/v1/flood-points?${params}`);
     if (requestId !== state.floodRequestId) return null;
@@ -1541,8 +1834,12 @@ function riverForecastHtml(data) {
 async function inspectPoint(event) {
   const requestId = ++state.inspectRequestId;
   const { lat, lng: lon } = event.latlng;
+  state.selectedLatLng = event.latlng;
   pointData.classList.remove("empty-state");
   pointData.textContent = "กำลังโหลด…";
+  // Start independently; tile failure must not hide weather and river data.
+  const terrainResult = terrainToggle.checked
+    ? sampleTerrainAt(lat, lon).then((value) => ({ value }), (error) => ({ error })) : null;
   // Independent requests: one failing source must not hide the other.
   const [weather, river] = await Promise.allSettled([
     getJSON(`/api/v1/weather/current?lat=${lat}&lon=${lon}`),
@@ -1552,10 +1849,18 @@ async function inspectPoint(event) {
   const current = weather.status === "fulfilled" ? weather.value.data.current || {} : null;
   pointData.innerHTML = `
     <div class="metric"><strong>พิกัด</strong><br>${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
+    ${terrainResult ? '<div class="metric" id="terrain-point-value"><strong>ความสูงภูมิประเทศ</strong><br>กำลังโหลด…</div>' : ""}
     <div class="metric"><strong>ฝน ณ จุดที่เลือก</strong> <span class="tag">แบบจำลองปัจจุบัน</span><br>
       ${current ? `${formatNumber(current.precipitation, 1)} มม./ชม.` : "โหลดไม่สำเร็จ"}</div>
     ${weather.status === "fulfilled" ? rainForecastHtml(weather.value.data) : `<div class="metric"><strong>พยากรณ์ฝน</strong><br>โหลดไม่สำเร็จ</div>`}
     ${river.status === "fulfilled" ? riverForecastHtml(river.value.data) : `<div class="metric"><strong>River discharge</strong><br>โหลดไม่สำเร็จ</div>`}`;
+  if (terrainResult) terrainResult.then(({ value, error }) => {
+    if (requestId !== state.inspectRequestId) return;
+    const target = pointData.querySelector("#terrain-point-value");
+    if (!target) return;
+    const reading = error ? "โหลดไม่สำเร็จ" : value == null ? "ไม่มีค่าพื้นดินที่จุดนี้" : `${formatNumber(value, 0)} เมตรโดยประมาณ`;
+    target.innerHTML = `<strong>ความสูงภูมิประเทศ</strong> <span class="tag">ไม่ใช่ระดับเสี่ยง</span><br>${reading}<br><small class="hint">Mapzen/USGS · ข้อมูลภูมิประเทศย้อนหลัง ไม่ใช่ระดับน้ำ ณ ปัจจุบัน</small>`;
+  });
 }
 
 // ---------------------------------------------------------------- ThaiWater station layers
@@ -1739,10 +2044,7 @@ async function loadThaiWater(layer) {
     renderHealth();
     return null;
   }
-  const b = map.getBounds();
-  const params = new URLSearchParams({
-    min_lon: b.getWest(), min_lat: b.getSouth(), max_lon: b.getEast(), max_lat: b.getNorth(),
-  });
+  const params = new URLSearchParams(thailandViewport());
   try {
     const result = await getJSON(`/api/v1/thaiwater/${layer}?${params}`);
     if (requestId !== cfg.requestId) return null;
@@ -1773,41 +2075,32 @@ for (const [layer, cfg] of Object.entries(THAIWATER_LAYERS)) {
 syncTwGroupSummary();
 
 const radarToggle = document.querySelector("#radar-toggle");
-const radarPlay = document.querySelector("#radar-play");
 function updateRadarControls() {
-  const enabled = radarToggle.checked && state.radarFrames.length > 0;
+  const enabled = radarToggle.checked && state.radar.frames.length > 0;
   radarRange.disabled = !enabled;
-  radarPlay.disabled = !enabled;
-  radarControlsEl.classList.toggle("is-disabled", !radarToggle.checked);
+  radarPlay.disabled = !enabled || state.radar.frames.length < 2;
+  radarSpeedEl.disabled = !enabled;
+  radarBarEl.hidden = !radarToggle.checked;
 }
-radarRange.addEventListener("input", () => showRadar(Number(radarRange.value)));
-radarPlay.addEventListener("click", (event) => {
-  if (state.timer) {
-    clearInterval(state.timer); state.timer = null; event.currentTarget.innerHTML = "<span>▶</span> เล่นภาพเคลื่อนไหว"; return;
-  }
-  if (!state.radarFrames.length) return;
-  event.currentTarget.innerHTML = "<span>■</span> หยุดภาพเคลื่อนไหว";
-  state.timer = setInterval(() => {
-    radarRange.value = (Number(radarRange.value) + 1) % state.radarFrames.length;
-    showRadar(Number(radarRange.value));
-  }, 1200);
+radarRange.addEventListener("input", () => { setRadarPlaying(false); showRadarFrame(Number(radarRange.value)); });
+radarPlay.addEventListener("click", () => setRadarPlaying(!state.radar.playing));
+radarSpeedEl.addEventListener("click", () => {
+  const r = state.radar;
+  r.speed = RADAR_SPEEDS[(RADAR_SPEEDS.indexOf(r.speed) + 1) % RADAR_SPEEDS.length];
+  radarSpeedEl.textContent = `${r.speed}×`;
+  radarSpeedEl.setAttribute("aria-label", `ความเร็วการเล่น ${r.speed} เท่า`);
 });
 radarToggle.addEventListener("change", (event) => {
   mapRadarStatusEl.hidden = !event.target.checked;
-  if (!event.target.checked && state.timer) {
-    clearInterval(state.timer);
-    state.timer = null;
-    radarPlay.innerHTML = "<span>▶</span> เล่นภาพเคลื่อนไหว";
+  if (event.target.checked) {
+    showRadarFrame(state.radar.index);
+    preloadNextRadar();
+  } else {
+    setRadarPlaying(false);
+    for (const layer of state.radar.layers) map.removeLayer(layer);
+    state.radar.loaded.clear();
   }
   updateRadarControls();
-  if (!state.radarLayer) return;
-  if (event.target.checked) {
-    state.radarLayer.setOpacity(0.58).addTo(map);
-    state.radarVisibleLayer = state.radarLayer;
-  } else {
-    if (state.radarVisibleLayer && map.hasLayer(state.radarVisibleLayer)) map.removeLayer(state.radarVisibleLayer);
-    if (map.hasLayer(state.radarLayer)) map.removeLayer(state.radarLayer);
-  }
 });
 updateRadarControls();
 floodToggle.addEventListener("change", () => {
@@ -1836,7 +2129,7 @@ document.querySelector("#flood-point-toggle").addEventListener("change", (event)
   event.target.checked ? state.floodPointLayer.addTo(map) : map.removeLayer(state.floodPointLayer);
   updateLayerCounts();
 });
-document.querySelector("#reset-view").addEventListener("click", () => map.flyTo([13.2, 101.2], 6, { duration: .7 }));
+document.querySelector("#reset-view").addEventListener("click", () => map.flyTo(offsetCenter(HOME.center, HOME.zoom), HOME.zoom, { duration: .7 }));
 
 // Redraws every marker layer from its already-fetched data, so this never re-hits the API.
 const riskOnlyToggle = document.querySelector("#risk-only-toggle");
@@ -1882,8 +2175,12 @@ locateButton.addEventListener("click", () => {
   navigator.geolocation.getCurrentPosition((position) => {
     locateButton.classList.remove("loading");
     locateButton.disabled = false;
-    locateButton.classList.add("active");
     const { latitude: lat, longitude: lon, accuracy } = position.coords;
+    if (!window.ThailandClip.contains(lon, lat)) {
+      showToast("ตำแหน่งปัจจุบันอยู่นอกประเทศไทย", "warn");
+      return;
+    }
+    locateButton.classList.add("active");
     showLocation(lat, lon, accuracy);
     map.flyTo([lat, lon], Math.max(map.getZoom(), 13), { duration: .7 });
     inspectPoint({ latlng: L.latLng(lat, lon) });  // rain and river outlook for where the user is
@@ -1978,8 +2275,18 @@ refreshButton.addEventListener("click", async () => {
 sidebarButton.addEventListener("click", () => {
   setSidebarOpen(!document.body.classList.contains("sidebar-open"));
 });
+// Phones: tapping the summary showing in the collapsed sheet expands it.
+document.querySelector(".overview").addEventListener("click", (event) => {
+  if (!isPhone() || document.body.classList.contains("sidebar-open") || event.target.closest("summary, a")) return;
+  setSidebarOpen(true);
+});
+// Phones: the sheet's grab handle expands/collapses it like the menu button does.
+document.querySelector("#sheet-handle").addEventListener("click", () => {
+  setSidebarOpen(!document.body.classList.contains("sidebar-open"));
+});
 mapAlertSummaryEl.addEventListener("click", () => setSidebarOpen(true, prioritySectionEl));
 map.on("click", (event) => {
+  if (!window.ThailandClip.contains(event.latlng.lng, event.latlng.lat)) return;
   inspectPoint(event);
   if (window.innerWidth <= 820) setSidebarOpen(true, selectedSectionEl);
 });
@@ -1994,6 +2301,7 @@ loadAreaChoices(null, areaProvinceEl, "เลือกจังหวัด");
 loadDamPhotos();
 setInterval(loadProvinceForecast, 60 * 60 * 1000);  // backend caches 3 h; this only picks that up
 loadProvinces().then(() => {
+  renderNewsOptions();
   priorityScopeEl.value = state.scope;
   if (state.scope) setScope(state.scope); else loadAlerts();
 });

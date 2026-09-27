@@ -74,3 +74,23 @@ def test_social_rejects_invalid_feed(monkeypatch):
     monkeypatch.setattr(local_social, "get_response", fake_response)
     response = client.get("/api/v1/local-social", params={"province": "สุโขทัย"})
     assert response.status_code == 503
+
+
+def test_social_description_match_does_not_claim_point_location():
+    videos = [{
+        "title": "ติดตามสถานการณ์น้ำล่าสุด", "description": "รายงานจากจังหวัดพระนครศรีอยุธยา",
+        "url": "https://www.youtube.com/watch?v=AAAAAAAAAAA",
+        "published_at": datetime.now(BANGKOK_TZ).isoformat(),
+    }]
+    data = local_social.for_province(videos, "พระนครศรีอยุธยา")
+    assert data["items"][0]["match_field"] == "description"
+    assert data["matching"] == "province_text"
+    assert "district" not in data["items"][0]
+
+
+def test_ambiguous_province_name_needs_location_cue():
+    video = {"title": "น้ำท่วมหนักเลย", "description": "รายงานทั่วไป", "url": "https://www.youtube.com/watch?v=AAAAAAAAAAA",
+             "published_at": datetime.now(BANGKOK_TZ).isoformat()}
+    assert local_social.for_province([video], "เลย")["items"] == []
+    video["title"] = "น้ำท่วม จ.เลย"
+    assert len(local_social.for_province([video], "เลย")["items"]) == 1
