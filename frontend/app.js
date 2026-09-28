@@ -28,22 +28,11 @@ function thailandViewport() {
     max_lat: Math.min(view.getNorth(), THAILAND_BOUNDS.getNorth()),
   };
 }
-// The map is full-bleed: on desktop the control panel floats over its left edge, on phones a
-// bottom sheet covers its lower part. Views, fits and popups keep clear of whichever covers it.
+// The map container itself stops at the floating panel (desktop) and at the collapsed bottom
+// sheet (phones) — see .map-shell margins in styles.css — so plain setView/fitBounds centre
+// on what the user can see, and the Thailand maxBounds centring above lands mid-screen too.
 const HOME = { center: [13.2, 101.2], zoom: 6 };
-const panelInset = () => (window.innerWidth > 820 ? (document.querySelector("#sidebar")?.offsetWidth || 0) + 24 : 0);
-const sheetInset = () => (window.innerWidth <= 820 ? Math.round(Math.min(232, window.innerHeight * 0.42)) : 0);
-function offsetCenter(latlng, zoom) {
-  const shift = L.point(panelInset() / 2, -sheetInset() / 2);
-  return map.unproject(map.project(latlng, zoom).subtract(shift), zoom);
-}
-map.setView(offsetCenter(HOME.center, HOME.zoom), HOME.zoom);
-function syncPopupPadding() {
-  L.Popup.prototype.options.autoPanPaddingTopLeft = [panelInset() + 8, 12];
-  L.Popup.prototype.options.autoPanPaddingBottomRight = [12, sheetInset() + 12];
-}
-syncPopupPadding();
-window.addEventListener("resize", syncPopupPadding);
+map.setView(HOME.center, HOME.zoom);
 // Source credits live in the map's attribution line instead of a separate footer bar.
 map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noreferrer">Leaflet</a>');
 map.attributionControl.addAttribution('<a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a> · <a href="https://www.thaiwater.net/" target="_blank" rel="noreferrer">ThaiWater</a> · ปภ. · กรมชลประทาน');
@@ -1411,7 +1400,7 @@ function setScope(name) {
   state.scope = name;
   storage.set(SCOPE_STORAGE_KEY, name);
   const pv = state.provinces.find((row) => row.name === name);
-  if (pv?.bbox) map.fitBounds([[pv.bbox[1], pv.bbox[0]], [pv.bbox[3], pv.bbox[2]]], { paddingTopLeft: [16 + panelInset(), 16], paddingBottomRight: [16, 16 + sheetInset()] });
+  if (pv?.bbox) map.fitBounds([[pv.bbox[1], pv.bbox[0]], [pv.bbox[3], pv.bbox[2]]], { padding: [16, 16] });
   loadAlerts();
   loadSatellitePriority();
   renderForecastLine();
@@ -1919,6 +1908,101 @@ for (const cfg of Object.values(THAIWATER_LAYERS)) {
   cfg.defaultMeta = cfg.metaEl.textContent;
 }
 
+// ---------------------------------------------------------------- river flow direction
+// Straight links between gauges on the same river, upstream -> downstream (see
+// backend/app/services/river_flow.py for why ordering by water level in m MSL works and where
+// it doesn't). Drawn on their own non-interactive canvas under the stations, so they never take
+// clicks meant for a station.
+map.createPane("flow").style.zIndex = 440;
+map.getPane("flow").style.pointerEvents = "none";
+const flowRenderer = L.canvas({ padding: 0.3, pane: "flow" });
+const FLOW_COLORS = { rising: "#ff8a3d", falling: "#5aa9e6", steady: "rgba(214, 232, 240, .7)", unknown: "rgba(170, 186, 196, .6)" };
+const FLOW_ALL_ZOOM = 7;   // below this only rising reaches are drawn
+const flowToggle = document.querySelector("#tw-flow-toggle");
+const flowMetaEl = document.querySelector("#tw-flow-meta");
+state.flow = { group: L.layerGroup(), segments: [], byStation: new Map(), requestId: 0 };
+const TREND_TEXT = { rising: "กำลังขึ้น", falling: "กำลังลด", steady: "ทรงตัว", unknown: "ไม่ทราบแนวโน้ม" };
+
+// A small chevron part-way along the link, pointing downstream, built in screen pixels.
+function flowChevron(a, b) {
+  const pa = map.latLngToLayerPoint(a), pb = map.latLngToLayerPoint(b);
+  const d = pb.subtract(pa);
+  const len = Math.hypot(d.x, d.y);
+  if (len < 26) return null;
+  const u = L.point(d.x / len, d.y / len), n = L.point(-u.y, u.x);
+  const tip = pa.add(d.multiplyBy(0.58));
+  const back = tip.subtract(u.multiplyBy(7));
+  return [back.add(n.multiplyBy(5)), tip, back.subtract(n.multiplyBy(5))].map((pt) => map.layerPointToLatLng(pt));
+}
+
+function renderRiverFlow() {
+  const f = state.flow;
+  f.group.clearLayers();
+  if (!flowToggle.checked) return;
+  const zoom = map.getZoom();
+  const shown = f.segments.filter((s) => zoom >= FLOW_ALL_ZOOM || s.trend === "rising");
+  // Rising last so it draws on top.
+  shown.sort((a, b) => (a.trend === "rising") - (b.trend === "rising"));
+  for (const s of shown) {
+    const a = [s.from.coordinates[1], s.from.coordinates[0]], b = [s.to.coordinates[1], s.to.coordinates[0]];
+    const style = {
+      renderer: flowRenderer, interactive: false, color: s.tidal ? FLOW_COLORS.unknown : FLOW_COLORS[s.trend],
+      weight: s.trend === "rising" ? 3 : 2, opacity: s.trend === "rising" ? .95 : .8, dashArray: s.tidal ? "3 5" : null, lineCap: "round",
+    };
+    L.polyline([a, b], style).addTo(f.group);
+    const chevron = s.tidal ? null : flowChevron(a, b);
+    if (chevron) L.polyline(chevron, { ...style, dashArray: null, weight: style.weight + .5 }).addTo(f.group);
+  }
+  const rising = f.segments.filter((s) => s.trend === "rising").length;
+  flowMetaEl.textContent = !f.segments.length ? "ไม่มีช่วงแม่น้ำที่มีสถานีต่อเนื่องในจอ"
+    : `${formatNumber(f.segments.length, 0)} ช่วงในจอ · ต้นน้ำกำลังขึ้น ${formatNumber(rising, 0)} ช่วง${zoom < FLOW_ALL_ZOOM ? " (ซูมเข้าเพื่อดูทุกช่วง)" : ""}`;
+  flowMetaEl.classList.toggle("flow-rising", rising > 0);
+  if (!map.hasLayer(f.group)) f.group.addTo(map);
+}
+
+async function loadRiverFlow() {
+  const f = state.flow;
+  const requestId = ++f.requestId;
+  if (!flowToggle.checked) return null;
+  const b = map.getBounds();
+  const params = new URLSearchParams({ min_lon: b.getWest(), min_lat: b.getSouth(), max_lon: b.getEast(), max_lat: b.getNorth() });
+  try {
+    const result = await getJSON(`/api/v1/river-flow?${params}`);
+    if (requestId !== f.requestId) return null;
+    f.segments = result.data.segments || [];
+    f.byStation = new Map();
+    for (const s of f.segments) {
+      if (!f.byStation.has(s.to.id)) f.byStation.set(s.to.id, {});
+      if (!f.byStation.has(s.from.id)) f.byStation.set(s.from.id, {});
+      f.byStation.get(s.to.id).up = s;
+      f.byStation.get(s.from.id).down = s;
+    }
+    renderRiverFlow();
+  } catch (error) {
+    if (requestId !== f.requestId) return null;
+    flowMetaEl.textContent = "โหลดไม่สำเร็จ";
+    console.warn("river flow unavailable", error);
+  }
+  return null;  // derived from ThaiWater water level; its health is recorded there
+}
+
+flowToggle.addEventListener("change", () => {
+  if (flowToggle.checked) loadRiverFlow();
+  else { state.flow.requestId++; state.flow.group.clearLayers(); flowMetaEl.textContent = "ปิดอยู่"; }
+});
+map.on("zoomend", () => { if (flowToggle.checked) renderRiverFlow(); });
+
+// Shown in a river gauge's popup: its neighbours along the river and the upstream trend.
+function flowSection(id) {
+  const link = state.flow.byStation.get(id);
+  if (!link) return "";
+  const up = link.up, down = link.down;
+  const upRow = up ? `<span>ต้นน้ำ</span><b>${escapeHtml(up.from.name)} · ${up.tidal ? "ช่วงน้ำทะเลหนุน" : `${TREND_TEXT[up.trend]}${up.from.trend_m != null ? ` ${up.from.trend_m > 0 ? "+" : ""}${formatNumber(up.from.trend_m)} ม.` : ""}`} · ห่าง ${formatNumber(up.length_km, 0)} กม.</b>` : "";
+  const downRow = down ? `<span>ท้ายน้ำ</span><b>${escapeHtml(down.to.name)} · ห่าง ${formatNumber(down.length_km, 0)} กม.</b>` : "";
+  const warn = up && up.trend === "rising" ? `<div class="popup-note flow-note">น้ำที่สถานีต้นน้ำ (${escapeHtml(up.from.name)}) กำลังขึ้น ควรเฝ้าดูสถานีนี้ · ยังคาดเวลาที่น้ำจะมาถึงไม่ได้</div>` : "";
+  return `<div class="popup-subtitle">ทิศทางน้ำในแม่น้ำ</div><div class="popup-grid">${upRow}${downRow}</div>${warn}`;
+}
+
 function twPopup(p) {
   const trend = p.trend_m == null ? "—"
     : `${p.trend_m > 0 ? "▲" : p.trend_m < 0 ? "▼" : "■"} ${formatNumber(Math.abs(p.trend_m))} ม.`;
@@ -1946,7 +2030,7 @@ function twPopup(p) {
     <div class="popup-grid">${rows}
       <span>จังหวัด</span><b>${escapeHtml(p.province)}</b>
       <span>เวลา</span><b>${escapeHtml(p.observed_at)}</b>
-    </div>${p.point_type === "river_gauge" && state.dpmByTwin.has(p.id) ? dpmSection(state.dpmByTwin.get(p.id)) : ""}${p.point_type === "river_gauge" ? `<div class="popup-note">${RIVER_GAUGE_NOTE}</div>` : p.point_type === "canal_gauge" ? `<div class="popup-note">${CANAL_GAUGE_NOTE}</div>` : ""}
+    </div>${p.point_type === "river_gauge" ? flowSection(p.id) : ""}${p.point_type === "river_gauge" && state.dpmByTwin.has(p.id) ? dpmSection(state.dpmByTwin.get(p.id)) : ""}${p.point_type === "river_gauge" ? `<div class="popup-note">${RIVER_GAUGE_NOTE}</div>` : p.point_type === "canal_gauge" ? `<div class="popup-note">${CANAL_GAUGE_NOTE}</div>` : ""}
     <div class="popup-source">${escapeHtml(p.source)} · via ${escapeHtml(p.provider)}</div>`;
 }
 
@@ -2129,7 +2213,7 @@ document.querySelector("#flood-point-toggle").addEventListener("change", (event)
   event.target.checked ? state.floodPointLayer.addTo(map) : map.removeLayer(state.floodPointLayer);
   updateLayerCounts();
 });
-document.querySelector("#reset-view").addEventListener("click", () => map.flyTo(offsetCenter(HOME.center, HOME.zoom), HOME.zoom, { duration: .7 }));
+document.querySelector("#reset-view").addEventListener("click", () => map.flyTo(HOME.center, HOME.zoom, { duration: .7 }));
 
 // Redraws every marker layer from its already-fetched data, so this never re-hits the API.
 const riskOnlyToggle = document.querySelector("#risk-only-toggle");
@@ -2244,7 +2328,7 @@ setBasemap(activeBasemap);
 loadTrafficStatus();
 async function refreshAll() {
   if (state.scope) loadSatellitePriority();
-  const results = (await Promise.all([loadRadar(), loadFlood(), loadDams(), loadFloodPoints(), loadAllThaiWater(), loadAlerts()]))
+  const results = (await Promise.all([loadRadar(), loadFlood(), loadDams(), loadFloodPoints(), loadAllThaiWater(), loadAlerts(), loadRiverFlow()]))
     .flat().filter((r) => r && !r.skipped);
   return results;
 }
@@ -2291,7 +2375,7 @@ map.on("click", (event) => {
   if (window.innerWidth <= 820) setSidebarOpen(true, selectedSectionEl);
 });
 map.on("moveend", () => {
-  loadFlood(); loadFloodPoints(); loadAllThaiWater();
+  loadFlood(); loadFloodPoints(); loadAllThaiWater(); loadRiverFlow();
   if (state.keepPriorityOnce) state.keepPriorityOnce = false;
   else if (!state.scope) loadAlerts();
 });

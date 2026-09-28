@@ -19,6 +19,7 @@
       <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 2.8c-3.3 4-6.3 7.7-6.3 11.2a6.3 6.3 0 0 0 12.6 0c0-3.5-3-7.2-6.3-11.2z"/><path d="M8.6 14.8c1.1.7 2.3.7 3.4 0s2.3-.7 3.4 0"/></symbol>
       <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      <symbol id="i-flow" viewBox="0 0 24 24"><path d="M3 7c3 0 3 3 6 3s3-3 6-3"/><path d="M3 15c3 0 3 3 6 3s3-3 6-3"/><path d="m16 5 4 2-4 2M16 13l4 2-4 2"/></symbol>
       <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></symbol>
       <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5.5v13M16 5.5v13" stroke-width="3"/></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6h.01"/></symbol>
@@ -194,6 +195,11 @@
                 <span class="layer-copy"><strong>ประตูระบายน้ำ</strong><small id="tw-watergate-meta">ระดับน้ำหน้า/ท้ายประตู</small></span>
                 <input id="tw-watergate-toggle" type="checkbox" /><span class="switch" aria-hidden="true"></span>
               </label>
+              <label class="layer-control" for="tw-flow-toggle">
+                <span class="layer-symbol river" aria-hidden="true"><svg class="icon"><use href="#i-flow"/></svg></span>
+                <span class="layer-copy"><strong>ทิศทางน้ำในแม่น้ำ</strong><small id="tw-flow-meta">ต้นน้ำ → ท้ายน้ำ ระหว่างสถานี</small></span>
+                <input id="tw-flow-toggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span>
+              </label>
               </details>
             </div>
           </section>
@@ -232,6 +238,7 @@
             </div>
             <p class="section-help">หมุด ปภ. แสดงสัญลักษณ์ข้างบนในหมุด · สถานี ThaiWater ใช้รูปทรงเดียวกัน: วงกลม = ปกติ/ต่ำ, สามเหลี่ยม = เฝ้าระวัง/สูง, แปดเหลี่ยม = วิกฤต, เส้นประ = ไม่มีข้อมูล · แต่ละแหล่งใช้เกณฑ์ของตัวเอง · ไม่พบจุดเตือนไม่ได้ยืนยันว่าไม่มีน้ำท่วม</p>
             <p class="section-help">ค่าเริ่มต้นกรองหมุดสถานีให้เหลือจุดถึงเกณฑ์ (สถานีฝนต้อง &gt; 35 มม./24 ชม.) ปิดตัวกรองหมุดในเมนูชั้นภาพบนแผนที่เพื่อดูจุดอื่น · ไม่กรองเขื่อนหรือภาพน้ำท่วม · จุดที่ซ่อนไม่ได้แปลว่าพื้นที่ปลอดภัย</p>
+            <p class="section-help">ทิศทางน้ำ: เส้นตรงเชื่อมสถานีวัดระดับน้ำในแม่น้ำเดียวกัน ลูกศรชี้จากต้นน้ำ (ระดับน้ำ ม.รทก. สูงกว่า) ไปท้ายน้ำ · <b style="color:#ff8a3d">ส้ม</b> = น้ำที่ต้นน้ำกำลังขึ้น ควรเฝ้าดูท้ายน้ำ · <b style="color:#5aa9e6">ฟ้า</b> = กำลังลด · เส้นประเทา = ช่วงน้ำทะเลหนุน ทิศทางกลับได้ · เป็นเส้นเชื่อม ไม่ใช่แนวลำน้ำจริง และไม่ได้บอกเวลาที่น้ำจะมาถึง</p>
             <p class="section-help">เขื่อน: สีน้ำเงินและแถบแสดงสัดส่วนความจุ ไม่ใช่ระดับภัย · 100%+ = เกินระดับเก็บกักปกติ · ▲▼ = น้ำเข้ามากหรือน้อยกว่าระบาย</p>
             <p class="section-help">หมุดที่มีตัวเลข = จุดเฝ้าระวังหลายจุดที่อยู่ใกล้กัน สีและสัญลักษณ์เป็นของจุดที่รุนแรงที่สุดในกลุ่ม กดเพื่อดูรายการ</p>
             </details>

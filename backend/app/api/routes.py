@@ -15,6 +15,7 @@ from backend.app.services.thaiwater import LAYERS, drop_stale, fetch_thaiwater_l
 from backend.app.services.provinces import normalize_province, province as find_province, provinces
 from backend.app.services.twins import link_river_twins
 from backend.app.services import radar_tiles, tmd
+from backend.app.services.river_flow import build_river_flow, segments_in_bbox
 from backend.app.services.dam_photos import fetch_dam_photos
 from backend.app.services.local_news import fetch_local_news
 from backend.app.services.local_social import fetch_official_video_feed, for_province as social_for_province
@@ -367,6 +368,34 @@ async def gistda_tile(
     # Flood windows rebuild about daily; recurring-flood areas are a multi-year summary.
     max_age = 86400 if layer == "flood-freq" else 900
     return Response(content, media_type="image/png", headers={"Cache-Control": f"public, max-age={max_age}"})
+
+
+@router.get("/river-flow")
+async def river_flow(
+    request: Request,
+    min_lon: float = Query(97.0, ge=-180, le=180),
+    min_lat: float = Query(5.0, ge=-90, le=90),
+    max_lon: float = Query(106.0, ge=-180, le=180),
+    max_lat: float = Query(21.0, ge=-90, le=90),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Upstream -> downstream links between ThaiWater river gauges, with the upstream trend.
+
+    Built from the same cached ThaiWater water-level entry as /thaiwater/water-level, so it
+    costs no extra upstream call. See services/river_flow.py for the method and its limits.
+    """
+    bbox = _bbox(min_lon, min_lat, max_lon, max_lat)
+
+    def in_view(data: dict) -> tuple[dict, dict]:
+        flow = build_river_flow(drop_stale(data["features"], LAYERS["water-level"].max_age_hours))
+        segments = segments_in_bbox(flow["segments"], bbox)
+        return {"segments": segments}, {"returned_count": len(segments), "rivers_national": flow["rivers"]}
+
+    return await _cached_response(
+        request, "thaiwater:water-level", "thaiwater-water-level",
+        lambda: fetch_thaiwater_layer("water-level", settings), settings.ttl("thaiwater-water-level"),
+        in_view, ("river-flow", _bbox_key(bbox)),
+    )
 
 
 @router.get("/thaiwater/{layer}")

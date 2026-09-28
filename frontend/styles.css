@@ -513,10 +513,9 @@ h2 { font-size: .92rem; font-weight: 700; letter-spacing: -.005em; }
 
 /* Desktop: overlays on the left start after the floating panel */
 @media (min-width: 821px) {
-  .leaflet-top.leaflet-left, .leaflet-bottom.leaflet-left { left: calc(var(--panel-w) + var(--gap)); }
-  .map-radar-status { left: calc(var(--panel-w) + var(--gap) * 2 + 48px); }
-  .map-basemap { left: calc(var(--panel-w) + var(--gap) * 2); }
-  .map-hint { left: calc(50% + (var(--panel-w) + var(--gap)) / 2); }
+  /* The map starts right of the floating panel, so its centre is the visible centre: Leaflet's
+     maxBounds centring, fitBounds, flyTo and popup autoPan need no inset corrections. */
+  .map-shell { margin-left: calc(var(--panel-w) + var(--gap) * 2); }
 }
 
 /* Phones: the panel becomes a bottom sheet that always shows the summary */
@@ -536,10 +535,9 @@ h2 { font-size: .92rem; font-weight: 700; letter-spacing: -.005em; }
   body:not(.sidebar-open) .sidebar-scroll { overflow: hidden; }
   .menu-button { display: grid; }
   .map-alert-summary { display: none !important; }
-  .leaflet-bottom { bottom: var(--peek); }
-  .map-basemap { bottom: calc(var(--peek) + 10px); }
+  /* The map ends where the collapsed sheet begins (same reason as the desktop margin). */
+  .map-shell { height: auto; margin-bottom: var(--peek); }  /* height:auto overrides the older 100% */
   .map-hint { display: none; }
-  .map-dam-panel { bottom: calc(var(--peek) + 56px); }
   body.sidebar-open .leaflet-top, body.sidebar-open .map-toolbar, body.sidebar-open .map-radar-status { visibility: visible; }
 }
 @media (prefers-reduced-motion: reduce) { aside { transition: none; } }
@@ -588,7 +586,7 @@ body { grid-template-columns: minmax(0, 1fr); }
 .map-radar-status { display: none; }                 /* the timeline bubble shows the frame time */
 .map-hint { display: none; }
 .radar-timeline {
-  position: absolute; z-index: 600; bottom: 24px; left: calc(var(--panel-w) + var(--gap) * 2); right: var(--gap);
+  position: absolute; z-index: 600; bottom: 24px; left: var(--gap); right: var(--gap);
   display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px;
   border: 1px solid var(--glass-line-strong); border-radius: 999px; background: var(--glass);
   backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); box-shadow: var(--shadow);
@@ -621,18 +619,18 @@ body { grid-template-columns: minmax(0, 1fr); }
 .map-basemap { bottom: 96px; }
 .map-dam-panel { bottom: 96px; }
 @media (max-width: 820px) {
-  .radar-timeline { left: 8px; right: 8px; bottom: calc(var(--peek) + 8px); gap: 8px; padding: 8px 10px 8px 8px; }
+  .radar-timeline { left: 8px; right: 8px; bottom: 8px; gap: 8px; padding: 8px 10px 8px 8px; }
   .radar-caption { display: none; }
   .radar-play { width: 36px; height: 36px; }
-  .map-basemap { bottom: calc(var(--peek) + 80px); }
-  .map-dam-panel { bottom: calc(var(--peek) + 128px); }
+  .map-basemap { bottom: 80px; }
+  .map-dam-panel { bottom: 128px; }
   body.sidebar-open .radar-timeline { visibility: hidden; }
 }
 @media (prefers-reduced-motion: reduce) { .leaflet-tile-pane .radar-frame, .radar-bubble { transition: none; } }
 .radar-ticks i, .radar-ticks b { font-style: normal; }
 
 /* Optional elevation context. Absolute bands remain separate from alert severity colours. */
-.terrain-legend { position: absolute; z-index: 500; top: 112px; left: calc(var(--panel-w) + var(--gap) * 2); width: min(270px, calc(100% - 24px)); padding: 10px 11px; border: 1px solid var(--glass-line-strong); border-radius: var(--r-md); background: var(--glass); backdrop-filter: var(--blur); box-shadow: var(--shadow); color: var(--text); pointer-events: none; }
+.terrain-legend { position: absolute; z-index: 500; top: 112px; left: var(--gap); width: min(270px, calc(100% - 24px)); padding: 10px 11px; border: 1px solid var(--glass-line-strong); border-radius: var(--r-md); background: var(--glass); backdrop-filter: var(--blur); box-shadow: var(--shadow); color: var(--text); pointer-events: none; }
 .terrain-legend[hidden] { display: none; }
 .terrain-legend strong { display: block; font-size: .72rem; }
 .terrain-legend-scale { display: flex; height: 10px; overflow: hidden; margin-top: 8px; border-radius: 5px; }
@@ -644,3 +642,6 @@ body { grid-template-columns: minmax(0, 1fr); }
   .terrain-legend { left: 10px; top: 105px; width: min(240px, calc(100% - 70px)); }
   body.sidebar-open .terrain-legend { visibility: hidden; }
 }
+/* River flow direction */
+.layer-copy small.flow-rising { color: #ffb27a; }
+.flow-note { background: rgba(255, 138, 61, .12); color: #ffd0a8; }
